@@ -12,7 +12,7 @@ data Phase = Left | Right
 data Bool = F | T
 
 # Type alias for 2-dimensional (qubit) state using Boolean as possible values
-type S2 = State<Boolean>
+type S2 = State<Bool>
 
 
 # State creation operator
