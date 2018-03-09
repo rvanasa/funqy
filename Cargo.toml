@@ -1,0 +1,7 @@
+[package]
+name = "funqy"
+version = "0.1.0"
+
+[dependencies]
+rand = "^0.4.2"
+num = "^0.1.42"
