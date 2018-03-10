@@ -1,6 +1,7 @@
 use std;
 
-use rand::*;
+use rand::thread_rng;
+use rand::distributions::{Weighted, WeightedChoice, Sample};
 
 use num::complex::Complex;
 
@@ -25,7 +26,7 @@ where Self: std::marker::Sized {
 	fn sup(self, s: Self) -> Self;
 	fn extract(self, vs: Vec<Self>) -> Self;
 	fn phase_flip(self) -> Self;
-	fn measure(self) -> usize;
+	fn measure(&self) -> usize;
 }
 
 impl Stateful for State {
@@ -70,8 +71,17 @@ impl Stateful for State {
 		self.into_iter().map(move |x| -x).collect()
 	}
 	
-	fn measure(self) -> usize {
-		0//////
+	fn measure(&self) -> usize {
+		let mut weights = vec![];
+		for (i, t) in self.iter().enumerate() {
+			weights.push(Weighted {
+				item: i,
+				weight: t.powc(real!(2))/*.abs()*/.re as u32,
+			});
+		}
+		let mut wc = WeightedChoice::new(&mut weights);
+		let mut rng = thread_rng();
+		wc.sample(&mut rng)
 	}
 }
 

@@ -31,4 +31,7 @@ pub enum Exp {
 	Tuple(Vec<Exp>),
 	// Data(Ident),
 	State(ExpRc),
+	Extract(ExpRc, Vec<Exp>),
+	Sup(ExpRc, ExpRc),
+	Measure(ExpRc),
 }

@@ -90,7 +90,20 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 		// &Exp::Data(ref id) => {
 		// 	RunVal::Data(ctx.find_data(id))
 		// },
-		&Exp::State(ref arg) => RunVal::State(build_state(eval_exp(arg, ctx)))
+		&Exp::State(ref arg) => RunVal::State(build_state(eval_exp(arg, ctx))),
+		&Exp::Extract(ref arg, ref dims) => {
+			let state = build_state(eval_exp(arg, ctx));
+			RunVal::State(state.extract(dims.iter().map(move |dim| build_state(eval_exp(dim, ctx))).collect()))
+		},
+		&Exp::Sup(ref exp_a, ref exp_b) => {
+			let a = build_state(eval_exp(exp_a, ctx));
+			let b = build_state(eval_exp(exp_b, ctx));
+			RunVal::State(a.sup(b))
+		},
+		&Exp::Measure(ref arg) => match eval_exp(arg, ctx) {
+			RunVal::State(ref state) => RunVal::State(get_state(state.measure())),
+			val => val,
+		},
 	}
 }
 
