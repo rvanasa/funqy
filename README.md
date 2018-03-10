@@ -6,7 +6,7 @@ FunQy is a concept for a terse, ergonomic quantum functional programming languag
 We hope to reduce the barrier to entry for aspiring quantum developers
 by leveraging high-level abstractions and design patterns common to classical programming languages. 
 
-In addition, we introduce a novel generalization of pattern matching, which we are using in the context of "superposition extraction".
+In addition, we introduce a novel generalization of pattern matching, which we are using in the context of "superposition extraction."
 Within an `extract` block, a developer may define outputs for each possible input such that
 when invoked with a superposition, the algorithm will destructure, individually invoke,
 and then restructure the superposition components.
