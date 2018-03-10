@@ -1,6 +1,10 @@
 #[macro_use]
 extern crate funqy;
+use funqy::ast::*;
+use funqy::engine::*;
 use funqy::eval::*;
+
+use std::rc::Rc;
 
 extern crate num;
 use num::complex::Complex;
@@ -12,9 +16,23 @@ fn round(f: Cf32, d: i32) -> Cf32 {
 }
 
 #[test]
-fn test() {
-	fn zero() -> State {vec![real!(1)]}
-	fn one() -> State {vec![real!(0), real!(1)]}
+fn test_eval() {
+	
+	let exp = Exp::Scope(vec![
+		Decl::Data("Bool", vec!["F", "T"]),
+		Decl::Let(Pat::Var("abc"), Exp::Var("T")),
+	], Rc::new(Exp::State(Rc::new(Exp::Var("abc")))));
+	
+	let ctx = Context::new();
+	let result = eval_exp(&exp, &ctx);
+	
+	println!("\n >> {}\n", result);
+}
+
+// #[test]
+fn test_engine() {
+	// fn zero() -> State {vec![real!(1)]}
+	// fn one() -> State {vec![real!(0), real!(1)]}
 	
 	// fn not(s: S2) -> S2 {
 	// 	s.extract(S2::one(), S2::zero())

@@ -1,104 +1,134 @@
-use std;
+use ast::*;
+use engine::*;
 
-use rand::*;
+use std::fmt;
+use std::rc::Rc;
+use std::collections::HashMap;
 
-use num::complex::Complex;
+type Error = String;
 
-pub type Cf32 = Complex<f32>;
-
-#[macro_export]
-macro_rules! real {
-	($n:expr) => {Complex::new(($n) as f32, 0_f32)}
+type RunValRc = Rc<RunVal>;
+#[derive(Clone,Debug)]
+pub enum RunVal {
+	Unit,
+	Data(DataType, usize), // TODO replace cloning with reference
+	Tuple(Vec<RunVal>),
+	State(State),
+	// Func(Pat, Exp),
+	// Unknown,
 }
 
-#[macro_export]
-macro_rules! imag {
-	($n:expr) => {Complex::new(0_f32, ($n) as f32)}
-}
-
-pub type State = Vec<Cf32>;
-
-pub trait Stateful
-where Self: std::marker::Sized {
-	fn combine(self, s: Self) -> Self;
-	fn sup(self, s: Self) -> Self;
-	fn extract(self, vs: Vec<Self>) -> Self;
-	fn phase_flip(self) -> Self;
-	fn measure(self) -> usize;
-}
-
-impl Stateful for State
-where Self: std::marker::Sized {
-	fn combine(self, s: State) -> State {
-		let mut state = vec![];
-		for x in self {
-			for y in s.iter() {
-				state.push(x * y);
-			}
+impl fmt::Display for RunVal {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			&RunVal::Unit => write!(f, "()"),
+			&RunVal::Data(_, ref index) => write!(f, "{}", index),
+			&RunVal::Tuple(ref vals) => write!(f, "({})", vals.iter().map(move |val| format!("{}", val)).collect::<Vec<String>>().join(", ")),
+			&RunVal::State(ref state) => write!(f, "[{}]", state.iter().map(move |index| format!("{}", index)).collect::<Vec<String>>().join(", ")),
 		}
-		state
-	}
-	
-	fn sup(self, s: State) -> State {
-		zip(self, s, move |x, y| x + y)
-	}
-	
-	fn extract(self, vs: Vec<State>) -> State {
-		self.into_iter().zip(vs).map(move |(x, s)| {
-			s.iter().map(move |y| x * y).collect()
-		}).fold(vec![], move |t, s: State| {
-			let mut t = t;
-			while t.len() < s.len() {
-				t.push(real!(0));
-			}
-			for i in 0..s.len() {
-				t[i] += s[i];
-			}
-			t
-		})
-	}
-	
-	fn phase_flip(self) -> State {
-		self.into_iter().map(move |x| -x).collect()
-	}
-	
-	fn measure(self) -> usize {
-		0//////
 	}
 }
 
-// fn normalize(state: State) -> State {
-// 	let mag = state.iter().fold(real!(0), move |a, b| a + (b * b));
-// 	state.into_iter().map(move |x| x / mag.sqrt()).collect()
-// }
-
-// Create a unit vector state in the given Hilbert dimension
-pub fn get_state(n: usize) -> State {
-	let mut state = vec![];
-	for i in 0..n {
-		state.push(real!(0));
-	}
-	state.push(real!(1));
-	state
+#[derive(Clone,Debug)]
+pub struct DataType {
+	pub choices: Vec<Ident>,
 }
 
-fn zip<T>(a: State, b: State, f: T) -> State
-where T: Fn(Cf32, Cf32) -> Cf32 {
-	let zero = real!(0);
-	// let (a, b) = if a.len() > b.len() {(a, b)} else {(b, a)};
-	let max_len = std::cmp::max(a.len(), b.len());
-	let mut a = a;
-	let mut b = b;
-	while a.len() < max_len {
-		a.push(zero);
-	}
-	while b.len() < max_len {
-		b.push(zero);
+#[derive(Clone,Debug)]
+pub struct Context {
+	vars: HashMap<Ident, RunVal>,
+	datatypes: HashMap<Ident, DataType>,
+}
+
+impl Context {
+	pub fn new() -> Context {
+		Context {
+			vars: HashMap::new(),
+			datatypes: HashMap::new(),
+		}
 	}
 	
-	let mut state = vec![];
-	for i in 0..max_len {
-		state.push(f(a[i], b[i]));
+	pub fn create_child(&self) -> Context {
+		self.clone()
 	}
-	state
+	
+	pub fn add_var(&mut self, id: Ident, val: RunVal) {
+		self.vars.insert(id, val);
+	}
+	
+	pub fn find_var(&self, id: &Ident) -> RunVal {
+		unwrap("Variable", id, self.vars.get(id))
+	}
+	
+	pub fn add_data(&mut self, id: Ident, dt: DataType) {
+		self.datatypes.insert(id, dt.clone());
+		for (i, choice) in dt.choices.iter().enumerate() {
+			self.add_var(choice, RunVal::Data(dt.clone(), i));
+		}
+	}
+	
+	pub fn find_data(&self, id: &Ident) -> DataType {
+		unwrap("Data value", id, self.datatypes.get(id))
+	}
+}
+
+fn unwrap<T:Clone>(cat: &str, id: &Ident, opt: Option<&T>) -> T {
+	(*opt.expect(&format!("{} not found in scope: `{}`", cat, id))).clone()
+}
+
+pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
+	match exp {
+		&Exp::Var(ref id) => ctx.find_var(id),
+		&Exp::Scope(ref decls, ref exp) => {
+			let mut child = ctx.create_child();
+			for decl in decls {
+				eval_decl(decl, &mut child);
+			}
+			eval_exp(exp, &child)
+		},
+		&Exp::Tuple(ref args) => RunVal::Tuple(args.iter().map(move |arg| eval_exp(arg, ctx)).collect()),
+		// &Exp::Data(ref id) => {
+		// 	RunVal::Data(ctx.find_data(id))
+		// },
+		&Exp::State(ref arg) => RunVal::State(build_state(eval_exp(arg, ctx)))
+	}
+}
+
+pub fn eval_decl(decl: &Decl, ctx: &mut Context) {
+	match decl {
+		&Decl::Data(ref id, ref choices) => {
+			let dt = DataType {choices: choices.clone()};
+			ctx.add_data(id, dt);
+		},
+		&Decl::Let(ref pat, ref exp) => match assign_pat(pat, &eval_exp(exp, ctx), ctx) {
+			Err(err) => panic!(err),
+			_ => {},
+		},
+	}
+}
+
+pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Result<(), Error> {
+	match (pat, val) {
+		(&Pat::Unit, &RunVal::Unit) => Ok(()),
+		(&Pat::Var(ref id), _) => {ctx.add_var(id, val.clone()); Ok(())},
+		(&Pat::Tuple(ref pats), &RunVal::Tuple(ref vals)) => {
+			if pats.len() != vals.len() {Err(format!("Invalid tuple length"))}
+			else {
+				for (pat, val) in pats.iter().zip(vals) {
+					assign_pat(pat, val, ctx);
+				}
+				Ok(())
+			}
+		},
+		_ => Err(format!("{:?} cannot deconstruct {:?}", pat, val))
+	}
+}
+
+pub fn build_state(val: RunVal) -> State {
+	match val {
+		RunVal::Unit => vec![],
+		RunVal::Data(dt, index) => get_state(index).pad(dt.choices.len()),
+		RunVal::Tuple(vals) => vals.into_iter().fold(get_state(0), move |a, b| a.combine(build_state(b))),
+		RunVal::State(state) => state,
+	}
 }
