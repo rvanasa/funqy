@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-pub type Ident = &'static str;
+pub type Ident = String;
 
 // Pattern (e.g. function parameters, match/extract cases)
 type PatRc = Rc<Pat>;
@@ -31,7 +31,11 @@ pub enum Exp {
 	Tuple(Vec<Exp>),
 	// Data(Ident),
 	State(ExpRc),
-	Extract(ExpRc, Vec<Exp>),
+	Extract(ExpRc, Vec<ExtractCase>),
 	Sup(ExpRc, ExpRc),
 	Measure(ExpRc),
 }
+
+// Extract dimension case
+#[derive(Clone,Debug,Eq,PartialEq)]
+pub struct ExtractCase(pub Exp, pub Exp);

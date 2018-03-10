@@ -63,7 +63,7 @@ impl Context {
 	pub fn add_data(&mut self, id: Ident, dt: DataType) {
 		self.datatypes.insert(id, dt.clone());
 		for (i, choice) in dt.choices.iter().enumerate() {
-			self.add_var(choice, RunVal::Data(dt.clone(), i));
+			self.add_var(choice.clone(), RunVal::Data(dt.clone(), i));
 		}
 	}
 	
@@ -86,14 +86,33 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 			}
 			eval_exp(exp, &child)
 		},
-		&Exp::Tuple(ref args) => RunVal::Tuple(args.iter().map(move |arg| eval_exp(arg, ctx)).collect()),
+		&Exp::Tuple(ref args) => RunVal::Tuple(args.iter()
+			.map(move |arg| eval_exp(arg, ctx))
+			.collect()),
 		// &Exp::Data(ref id) => {
 		// 	RunVal::Data(ctx.find_data(id))
 		// },
 		&Exp::State(ref arg) => RunVal::State(build_state(eval_exp(arg, ctx))),
-		&Exp::Extract(ref arg, ref dims) => {
+		&Exp::Extract(ref arg, ref cases) => {
 			let state = build_state(eval_exp(arg, ctx));
-			RunVal::State(state.extract(dims.iter().map(move |dim| build_state(eval_exp(dim, ctx))).collect()))
+			let mut dims: Vec<State> = vec![];
+			for &ExtractCase(ref selector, ref result) in cases {
+				let state = build_state(eval_exp(selector, ctx));
+				let result_state = build_state(eval_exp(result, ctx));
+				while dims.len() < state.len() {
+					dims.push(vec![]);
+				}
+				for (i, s) in state.iter().enumerate() {
+					if !::num::Zero::is_zero(s) {
+						let mut dim = dims[i].clone().pad(result_state.len());
+						for (j, r) in result_state.iter().enumerate() {
+							dim[j] += r;
+						}
+						dims[i] = dim;
+					}
+				}
+			}
+			RunVal::State(state.extract(dims))
 		},
 		&Exp::Sup(ref exp_a, ref exp_b) => {
 			let a = build_state(eval_exp(exp_a, ctx));
@@ -111,7 +130,7 @@ pub fn eval_decl(decl: &Decl, ctx: &mut Context) {
 	match decl {
 		&Decl::Data(ref id, ref choices) => {
 			let dt = DataType {choices: choices.clone()};
-			ctx.add_data(id, dt);
+			ctx.add_data(id.clone(), dt);
 		},
 		&Decl::Let(ref pat, ref exp) => match assign_pat(pat, &eval_exp(exp, ctx), ctx) {
 			Err(err) => panic!(err),
@@ -123,7 +142,7 @@ pub fn eval_decl(decl: &Decl, ctx: &mut Context) {
 pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Result<(), Error> {
 	match (pat, val) {
 		(&Pat::Unit, &RunVal::Unit) => Ok(()),
-		(&Pat::Var(ref id), _) => {ctx.add_var(id, val.clone()); Ok(())},
+		(&Pat::Var(ref id), _) => {ctx.add_var(id.clone(), val.clone()); Ok(())},
 		(&Pat::Tuple(ref pats), &RunVal::Tuple(ref vals)) => {
 			if pats.len() != vals.len() {Err(format!("Invalid tuple length"))}
 			else {

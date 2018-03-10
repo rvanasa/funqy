@@ -1,0 +1,8 @@
+data Bool = F | T
+
+let (abc, def) = ((F, T), T)
+
+extract abc {
+	(F, T) => (T, T)
+	(T, F) => (F, F)
+}

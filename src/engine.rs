@@ -1,5 +1,3 @@
-use std;
-
 use rand::thread_rng;
 use rand::distributions::{Weighted, WeightedChoice, Sample};
 
@@ -20,7 +18,7 @@ macro_rules! imag {
 pub type State = Vec<Cf32>;
 
 pub trait Stateful
-where Self: std::marker::Sized {
+where Self: ::std::marker::Sized {
 	fn pad(self, n: usize) -> Self;
 	fn combine(self, s: Self) -> Self;
 	fn sup(self, s: Self) -> Self;
@@ -76,7 +74,7 @@ impl Stateful for State {
 		for (i, t) in self.iter().enumerate() {
 			weights.push(Weighted {
 				item: i,
-				weight: t.powc(real!(2))/*.abs()*/.re as u32,
+				weight: (t/*.abs()*/ * t).re as u32,
 			});
 		}
 		let mut wc = WeightedChoice::new(&mut weights);
@@ -104,7 +102,7 @@ fn zip<T>(a: State, b: State, f: T) -> State
 where T: Fn(Cf32, Cf32) -> Cf32 {
 	let zero = real!(0);
 	// let (a, b) = if a.len() > b.len() {(a, b)} else {(b, a)};
-	let max_len = std::cmp::max(a.len(), b.len());
+	let max_len = ::std::cmp::max(a.len(), b.len());
 	let mut a = a;
 	let mut b = b;
 	while a.len() < max_len {

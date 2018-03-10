@@ -3,6 +3,7 @@ extern crate funqy;
 use funqy::ast::*;
 use funqy::engine::*;
 use funqy::eval::*;
+use funqy::parser::*;
 
 use std::rc::Rc;
 
@@ -16,34 +17,46 @@ fn round(f: Cf32, d: i32) -> Cf32 {
 }
 
 #[test]
+fn test_parser() {
+	
+	let exp = parse_file("tests/scripts/Test.fqy").expect("Could not parse file");
+	let ctx = Context::new();
+	
+	println!("{:?}", exp);
+	println!(">> {}", eval_exp(&exp, &ctx));
+}
+
+// #[test]
 fn test_eval() {
+
+	// let a = Exp::Tuple(vec![
+	// 	Exp::Var("x"),
+	// 	Exp::Var("y"),
+	// ]);
 	
-	let a = Exp::Tuple(vec![
-		Exp::Var("x"),
-		Exp::Var("y"),
-	]);
+	// let b = Exp::Tuple(vec![
+	// 	Exp::Var("F"),
+	// 	Exp::Var("T"),
+	// ]);
 	
-	let b = Exp::Tuple(vec![
-		Exp::Var("F"),
-		Exp::Var("T"),
-	]);
+	// let ret = Exp::Extract(Rc::new(Exp::Var("state")), vec![
+	// 	Exp::Var("F"),
+	// 	Exp::Tuple(vec![Exp::Var("F"), Exp::Var("T")]),
+	// 	Exp::Tuple(vec![Exp::Var("T"), Exp::Var("F")]),
+	// 	Exp::Var("T"),
+	// ]);
 	
-	let ret = Exp::Extract(Rc::new(Exp::Var("state")), vec![
-		Exp::Var("F"),
-		Exp::Tuple(vec![Exp::Var("F"), Exp::Var("T")]),
-		Exp::Tuple(vec![Exp::Var("T"), Exp::Var("F")]),
-		Exp::Var("T"),
-	]);
+	// let exp = Exp::Scope(vec![
+	// 	Decl::Data("Bool", vec!["F", "T"]),
+	// 	Decl::Let(Pat::Var("x"), Exp::Var("T")),
+	// 	Decl::Let(Pat::Var("y"), Exp::Var("F")),
+	// 	Decl::Let(Pat::Var("state"), Exp::Sup(Rc::new(a), Rc::new(b))),
+	// ], Rc::new(Exp::Tuple(vec![
+	// 	ret.clone(),
+	// 	Exp::Measure(Rc::new(ret)),
+	// ])));
 	
-	let exp = Exp::Scope(vec![
-		Decl::Data("Bool", vec!["F", "T"]),
-		Decl::Let(Pat::Var("x"), Exp::Var("T")),
-		Decl::Let(Pat::Var("y"), Exp::Var("F")),
-		Decl::Let(Pat::Var("state"), Exp::Sup(Rc::new(a), Rc::new(b))),
-	], Rc::new(Exp::Tuple(vec![
-		ret.clone(),
-		Exp::Measure(Rc::new(ret)),
-	])));
+	let exp = Exp::Tuple(vec![]);
 	
 	let ctx = Context::new();
 	let result = eval_exp(&exp, &ctx);
