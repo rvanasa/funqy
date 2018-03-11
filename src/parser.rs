@@ -17,6 +17,11 @@ named!(ident<String>, ws!(map!( // TODO ensure first char is non-numeric
 	|s| s.to_string()
 )));
 
+named!(opr<String>, ws!(map!(
+	map_res!(take_while1!(|c| "~!@#$%^&*/-+".contains(c as char)), ::std::str::from_utf8),
+	|s| s.to_string()
+)));
+
 named!(var_exp<Exp>, map!(
 	ident,
 	Exp::Var
@@ -28,7 +33,7 @@ named!(tuple_exp<Exp>, map!(
 		separated_list!(ws!(tag!(",")), exp),
 		ws!(tag!(")"))
 	),
-	Exp::Tuple
+	|vec| if vec.len() == 1 {vec[0].clone()} else {Exp::Tuple(vec)}
 ));
 
 named!(block_exp<Exp>,
@@ -81,15 +86,24 @@ named!(case<Vec<Case>>,
 	alt!(default_case | exp_case)
 );
 
+named!(prefix_opr_exp<Exp>, do_parse!(
+	opr: opr >>
+	exp: exp >>
+	(Exp::Invoke(Rc::new(Exp::Var(opr)), Rc::new(exp)))
+));
+
 named!(path_exp<Exp>,
 	alt!(extract_exp | var_exp | tuple_exp | block_exp)
 );
 
-named!(exp<Exp>, do_parse!(
+named!(target_exp<Exp>, do_parse!(
 	path: path_exp >>
 	invokes: many0!(tuple_exp) >>
 	(invokes.into_iter().fold(path, move |a, b| Exp::Invoke(Rc::new(a), Rc::new(b))))
 ));
+
+named!(exp<Exp>,
+	alt!(prefix_opr_exp | target_exp));
 
 named!(let_decl<Decl>, do_parse!(
 	ws!(tag!("let")) >>
@@ -109,7 +123,7 @@ named!(data_decl<Decl>, do_parse!(
 
 named!(func_decl<Decl>, do_parse!(
 	ws!(tag!("fn")) >>
-	id: ident >>
+	id: alt!(ident | delimited!(ws!(tag!("(")), opr, ws!(tag!(")")))) >>
 	part: func_part >>
 	(Decl::Let(Pat::Var(id), part))
 ));
@@ -131,13 +145,21 @@ named!(func_part<Exp>,
 	alt!(func_basic_part | func_extract_part)
 );
 
+named!(assert_decl<Decl>, do_parse!(
+	ws!(tag!("assert")) >>
+	expect: exp >>
+	ws!(tag!(":")) >>
+	result: exp >>
+	(Decl::Assert(expect, result))
+));
+
 named!(data_val<Ident>, do_parse!(
 	id: ident >>
 	(id)
 ));
 
 named!(decl<Decl>,
-	alt!(let_decl | data_decl | func_decl)
+	alt!(let_decl | data_decl | func_decl | assert_decl)
 );
 
 named!(wildcard_pat<Pat>, do_parse!(

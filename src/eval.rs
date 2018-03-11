@@ -8,7 +8,7 @@ use std::collections::HashMap;
 type Error = String;
 
 type RunValRc = Rc<RunVal>;
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub enum RunVal {
 	Data(DataType, usize), // TODO replace cloning with reference
 	Tuple(Vec<RunVal>),
@@ -29,7 +29,7 @@ impl fmt::Display for RunVal {
 	}
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub struct DataType {
 	pub variants: Vec<Ident>,
 }
@@ -152,6 +152,13 @@ pub fn eval_decl(decl: &Decl, ctx: &mut Context) {
 		&Decl::Let(ref pat, ref exp) => match assign_pat(pat, &eval_exp(exp, ctx), ctx) {
 			Err(err) => panic!(err),
 			_ => {},
+		},
+		&Decl::Assert(ref expect, ref result) => {
+			let a = eval_exp(expect, ctx);
+			let b = eval_exp(result, ctx);
+			if a != b {
+				panic!("Assertion failed: {} != {}", a, b);
+			}
 		},
 	}
 }

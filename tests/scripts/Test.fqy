@@ -1,8 +1,14 @@
 data Bool = F | T
+data Dir3 = X | Y | Z
 
 let (abc, qwe) = ((F, T), T)
 
-fn not = {
+fn (@) = {
+	F => F
+	T => T
+}
+
+fn (!) = {
 	F => T
 	T => F
 }
@@ -11,5 +17,8 @@ fn equal = {
 	(F, F) | (T, T) => T
 	_ => F
 }
+
+assert @T : equal(T, T)
+assert @T : !equal(F, T)
 
 equal(T, T)

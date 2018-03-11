@@ -19,6 +19,7 @@ pub enum Decl {
 	Data(Ident, Vec<Ident>),
 	// Type(Ident, Type),
 	Let(Pat, Exp),
+	Assert(Exp, Exp),
 	// Func(Pat, Exp),
 }
 
