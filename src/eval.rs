@@ -135,30 +135,26 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 		&Exp::State(ref arg) => RunVal::State(build_state(eval_exp(arg, ctx))),
 		&Exp::Extract(ref arg, ref cases) => {
 			let state = build_state(eval_exp(arg, ctx));
+			let def: State = match cases.get(cases.len() - 1) {
+				Some(&Case::Default(ref result)) => build_state(eval_exp(result, ctx)),
+				_ => vec![],
+			};
 			let mut dims: Vec<State> = vec![];
-			let mut def: State = vec![];
+			while dims.len() < state.len() {
+				dims.push(def.clone());
+			}
 			for (i, case) in cases.iter().rev().enumerate() {
 				match case {
 					&Case::Exp(ref selector, ref result) => {
 						let state = build_state(eval_exp(selector, ctx));
 						let result_state = build_state(eval_exp(result, ctx));
-						while dims.len() < state.len() {
-							dims.push(def.clone());
-						}
 						for (i, s) in state.iter().enumerate() {
 							if !::num::Zero::is_zero(s) {
 								dims[i] = result_state.clone();
 							}
 						}
 					},
-					&Case::Default(ref result) => {
-						if i > 0 {
-							panic!("`_` must be the final case");
-						}
-						else {
-							def = build_state(eval_exp(result, ctx));
-						}
-					},
+					&Case::Default(_) => {},
 				}
 			}
 			RunVal::State(state.extract(dims))
@@ -209,7 +205,7 @@ pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Result<(), Erro
 				Ok(())
 			}
 		},
-		_ => Err(format!("{:?} cannot deconstruct {:?}", pat, val))
+		_ => Err(format!("{:?} cannot deconstruct `{}`", pat, val))
 	}
 }
 

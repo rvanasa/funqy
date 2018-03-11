@@ -3,31 +3,6 @@ data Dir3 = X | Y | Z
 
 let (abc, qwe) = ((F, T), T)
 
-fn (@) = {
-	F => F,
-	T => T,
-}
-
-fn (!) = {
-	F => T,
-	T => F,
-}
-
-let (^) = sup
-let (~) = phf
-
-fn had = {
-	F => ^(F, T),
-	T => ^(F, ~T),
-}
-
-fn cnot(a, b) = extract a {
-	F => (F, b)
-	T => (T, !b)
-}
-
-fn bell(a, b) = cnot(had(a), b)
-
 fn equal = {
 	(F, F) | (T, T) => T,
 	_ => F,
@@ -38,7 +13,34 @@ fn parallel = {
 	_ => F,
 }
 
+fn (@)(s) = extract s {
+	_ => s,
+}
+
+fn (!) = {
+	F => T,
+	T => F,
+}
+
 assert @T : equal(T, T)
 assert @T : !equal(F, T)
+
+let (^) = sup
+let (~) = phf
+
+fn had = {
+	F => ^(F, T),
+	T => ^(F, ~T),
+}
+
+fn cnot(a, b) = extract a {
+	F => (F, b),
+	T => (T, !b),
+}
+
+let (#) = had
+let (*!) = cnot
+
+fn bell(a, b) = *!(#a, b)
 
 bell(F, F)

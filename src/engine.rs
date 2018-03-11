@@ -54,8 +54,7 @@ impl Stateful for State {
 	fn extract(self, vs: Vec<State>) -> State {
 		self.into_iter().zip(vs).map(|(x, s)| {
 			s.iter().map(|y| x * y).collect()
-		}).fold(vec![], |t, s: State| {
-			let mut t = t;
+		}).fold(vec![], |mut t, s: State| {
 			while t.len() < s.len() {
 				t.push(real!(0));
 			}

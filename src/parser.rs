@@ -18,7 +18,7 @@ named!(name_ident<String>, ws!(map!( // TODO ensure first char is non-numeric
 )));
 
 named!(opr_ident<String>, ws!(map!(
-	map_res!(take_while1!(|c| "~!@#$%^&*/-+".contains(c as char)), ::std::str::from_utf8),
+	map_res!(take_while1!(|c| "~!@#%^&*/-+".contains(c as char)), ::std::str::from_utf8),
 	|s| s.to_string()
 )));
 
@@ -144,7 +144,7 @@ named!(func_basic_part<Exp>, do_parse!(
 ));
 
 named!(func_extract_part<Exp>, do_parse!(
-	ws!(tag!("=")) >>
+	opt!(ws!(tag!("="))) >>
 	cases: extract_cases >>
 	(Exp::Lambda(Pat::Var("$arg".to_string()), Rc::new(Exp::Extract(Rc::new(Exp::Var("$arg".to_string())), cases))))
 ));
@@ -186,7 +186,7 @@ named!(tuple_pat<Pat>, map!(
 		separated_list!(ws!(tag!(",")), pat),
 		ws!(tag!(")"))
 	),
-	Pat::Tuple
+	|vec| if vec.len() == 1 {vec[0].clone()} else {Pat::Tuple(vec)}
 ));
 
 named!(pat<Pat>,
