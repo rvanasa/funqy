@@ -6,7 +6,7 @@ pub type Ident = String;
 type PatRc = Rc<Pat>;
 #[derive(Clone,Debug,Eq,PartialEq)]
 pub enum Pat {
-	Unit,
+	Wildcard,
 	Var(Ident),
 	Tuple(Vec<Pat>),
 	// Data(Ident, PatRc),
@@ -29,13 +29,16 @@ pub enum Exp {
 	Var(Ident),
 	Scope(Vec<Decl>, ExpRc),
 	Tuple(Vec<Exp>),
-	// Data(Ident),
+	Lambda(Pat, ExpRc),
+	Invoke(ExpRc, ExpRc),
 	State(ExpRc),
-	Extract(ExpRc, Vec<ExtractCase>),
+	Extract(ExpRc, Vec<Case>),
 	Sup(ExpRc, ExpRc),
 	Measure(ExpRc),
 }
 
-// Extract dimension case
 #[derive(Clone,Debug,Eq,PartialEq)]
-pub struct ExtractCase(pub Exp, pub Exp);
+pub enum Case {
+	Exp(Exp, Exp),
+	Default(Exp),
+}

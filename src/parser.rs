@@ -12,7 +12,7 @@ pub type Error = String;
 // 	($id:tt) => {ws!(tag!($id))};
 // }
 
-named!(ident<String>, ws!(map!(
+named!(ident<String>, ws!(map!( // TODO ensure first char is non-numeric
 	map_res!(take_while1!(nom::is_alphanumeric), ::std::str::from_utf8),
 	|s| s.to_string()
 )));
@@ -48,24 +48,48 @@ named!(scope_exp<Exp>, do_parse!(
 named!(extract_exp<Exp>, do_parse!(
 	ws!(tag!("extract")) >>
 	exp: exp >>
-	cases: delimited!(
-		ws!(tag!("{")),
-		many0!(extract_case),
-		ws!(tag!("}"))
-	) >>
+	cases: extract_cases >>
 	(Exp::Extract(Rc::new(exp), cases))
 ));
 
-named!(extract_case<ExtractCase>, do_parse!(
-	selector: exp >>
-	ws!(tag!("=>")) >>
-	result: exp >>
-	(ExtractCase(selector, result))
+named!(extract_cases<Vec<Case>>, map!(
+	delimited!(
+		ws!(tag!("{")),
+		many0!(case),
+		ws!(tag!("}"))
+	),
+	|vec| vec.into_iter().flat_map(move |c| c).collect()
 ));
 
-named!(exp<Exp>,
+named!(default_case<Vec<Case>>, do_parse!(
+	ws!(tag!("_")) >>
+	ws!(tag!("=>")) >>
+	result: exp >>
+	opt!(ws!(tag!(","))) >>
+	(vec![Case::Default(result)])
+));
+
+named!(exp_case<Vec<Case>>, do_parse!(
+	selectors: separated_list!(ws!(tag!("|")), exp) >>
+	ws!(tag!("=>")) >>
+	result: exp >>
+	opt!(ws!(tag!(","))) >>
+	(selectors.into_iter().map(|selector| Case::Exp(selector, result.clone())).collect())
+));
+
+named!(case<Vec<Case>>,
+	alt!(default_case | exp_case)
+);
+
+named!(path_exp<Exp>,
 	alt!(extract_exp | var_exp | tuple_exp | block_exp)
 );
+
+named!(exp<Exp>, do_parse!(
+	path: path_exp >>
+	invokes: many0!(tuple_exp) >>
+	(invokes.into_iter().fold(path, move |a, b| Exp::Invoke(Rc::new(a), Rc::new(b))))
+));
 
 named!(let_decl<Decl>, do_parse!(
 	ws!(tag!("let")) >>
@@ -79,9 +103,33 @@ named!(data_decl<Decl>, do_parse!(
 	ws!(tag!("data")) >>
 	id: ident >>
 	ws!(tag!("=")) >>
-	choices: separated_list!(ws!(tag!("|")), data_val) >>
-	(Decl::Data(id, choices))
+	variants: separated_list!(ws!(tag!("|")), data_val) >>
+	(Decl::Data(id, variants))
 ));
+
+named!(func_decl<Decl>, do_parse!(
+	ws!(tag!("fn")) >>
+	id: ident >>
+	part: func_part >>
+	(Decl::Let(Pat::Var(id), part))
+));
+
+named!(func_basic_part<Exp>, do_parse!(
+	pat: tuple_pat >>
+	ws!(tag!("=")) >>
+	body: exp >>
+	(Exp::Lambda(pat, Rc::new(body)))
+));
+
+named!(func_extract_part<Exp>, do_parse!(
+	ws!(tag!("=")) >>
+	cases: extract_cases >>
+	(Exp::Lambda(Pat::Var("@arg".to_string()), Rc::new(Exp::Extract(Rc::new(Exp::Var("@arg".to_string())), cases))))
+));
+
+named!(func_part<Exp>,
+	alt!(func_basic_part | func_extract_part)
+);
 
 named!(data_val<Ident>, do_parse!(
 	id: ident >>
@@ -89,8 +137,13 @@ named!(data_val<Ident>, do_parse!(
 ));
 
 named!(decl<Decl>,
-	alt!(let_decl | data_decl)
+	alt!(let_decl | data_decl | func_decl)
 );
+
+named!(wildcard_pat<Pat>, do_parse!(
+	ws!(tag!("_")) >>
+	(Pat::Wildcard)
+));
 
 named!(var_pat<Pat>, map!(
 	ident,
@@ -107,44 +160,8 @@ named!(tuple_pat<Pat>, map!(
 ));
 
 named!(pat<Pat>,
-	alt!(var_pat | tuple_pat)
+	alt!(wildcard_pat | var_pat | tuple_pat)
 );
-
-// named!(string<&str>,
-// 	delimited!(
-// 		tag!("\""),
-// 		map_res!(
-// 		  escaped!(take_while1!(nom::is_alphanumeric), '\\', one_of!("\"n\\")),
-// 		  str::from_utf8
-// 		),
-// 		tag!("\"")
-// 	)
-// );
-
-// named!(array<Vec<JsonValue>>,
-//   ws!(delimited!(
-// 	tag!("["),
-// 	separated_list!(tag!(","), value),
-// 	tag!("]")
-//   ))
-// );
-
-// named!(key_value<(&str, JsonValue)>,
-//   ws!(separated_pair!(string, tag!(":"), value))
-// );
-
-// named!(hash<HashMap<String, JsonValue>>,
-//   ws!(map!(
-// 	delimited!(tag!("{"), separated_list!(tag!(","), key_value), tag!("}")),
-// 	|tuple_vec| {
-// 	  let mut h: HashMap<String, JsonValue> = HashMap::new();
-// 	  for (k, v) in tuple_vec {
-// 		h.insert(String::from(k), v);
-// 	  }
-// 	  h
-// 	}
-//   ))
-// );
 
 pub fn parse_file(path: &str) -> Result<Exp, Error> {
 	let mut file = File::open(&path).expect("Could not open file"); // convert to Result

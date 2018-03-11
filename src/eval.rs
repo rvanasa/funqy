@@ -10,28 +10,28 @@ type Error = String;
 type RunValRc = Rc<RunVal>;
 #[derive(Clone,Debug)]
 pub enum RunVal {
-	Unit,
 	Data(DataType, usize), // TODO replace cloning with reference
 	Tuple(Vec<RunVal>),
 	State(State),
-	// Func(Pat, Exp),
-	// Unknown,
+	Func(Pat, Exp),
+	Error(Error),
 }
 
 impl fmt::Display for RunVal {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
-			&RunVal::Unit => write!(f, "()"),
-			&RunVal::Data(_, ref index) => write!(f, "{}", index),
+			&RunVal::Data(ref dt, ref index) => write!(f, "{}", dt.variants[*index]),
 			&RunVal::Tuple(ref vals) => write!(f, "({})", vals.iter().map(move |val| format!("{}", val)).collect::<Vec<String>>().join(", ")),
+			&RunVal::Func(ref pat, ref body) => write!(f, "{:?} -> {:?}", pat, body),
 			&RunVal::State(ref state) => write!(f, "[{}]", state.iter().map(move |index| format!("{}", index)).collect::<Vec<String>>().join(", ")),
+			&RunVal::Error(ref err) => write!(f, "<<{}>>", err),
 		}
 	}
 }
 
 #[derive(Clone,Debug)]
 pub struct DataType {
-	pub choices: Vec<Ident>,
+	pub variants: Vec<Ident>,
 }
 
 #[derive(Clone,Debug)]
@@ -62,8 +62,8 @@ impl Context {
 	
 	pub fn add_data(&mut self, id: Ident, dt: DataType) {
 		self.datatypes.insert(id, dt.clone());
-		for (i, choice) in dt.choices.iter().enumerate() {
-			self.add_var(choice.clone(), RunVal::Data(dt.clone(), i));
+		for (i, variant) in dt.variants.iter().enumerate() {
+			self.add_var(variant.clone(), RunVal::Data(dt.clone(), i));
 		}
 	}
 	
@@ -79,37 +79,54 @@ fn unwrap<T:Clone>(cat: &str, id: &Ident, opt: Option<&T>) -> T {
 pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 	match exp {
 		&Exp::Var(ref id) => ctx.find_var(id),
-		&Exp::Scope(ref decls, ref exp) => {
+		&Exp::Scope(ref decls, ref ret) => {
 			let mut child = ctx.create_child();
 			for decl in decls {
 				eval_decl(decl, &mut child);
 			}
-			eval_exp(exp, &child)
+			eval_exp(ret, &child)
 		},
 		&Exp::Tuple(ref args) => RunVal::Tuple(args.iter()
 			.map(move |arg| eval_exp(arg, ctx))
 			.collect()),
-		// &Exp::Data(ref id) => {
-		// 	RunVal::Data(ctx.find_data(id))
-		// },
+		&Exp::Lambda(ref pat, ref body) => RunVal::Func(pat.clone(), (**body).clone()),
+		&Exp::Invoke(ref target, ref arg) => {
+			match eval_exp(target, ctx) {
+				RunVal::Func(pat, body) => {
+					let mut child = ctx.create_child();
+					assign_pat(&pat, &eval_exp(arg, ctx), &mut child).unwrap();
+					eval_exp(&body, &child)
+				},
+				val => RunVal::Error(format!("Cannot invoke {}", val)),
+			}
+		},
 		&Exp::State(ref arg) => RunVal::State(build_state(eval_exp(arg, ctx))),
 		&Exp::Extract(ref arg, ref cases) => {
 			let state = build_state(eval_exp(arg, ctx));
 			let mut dims: Vec<State> = vec![];
-			for &ExtractCase(ref selector, ref result) in cases {
-				let state = build_state(eval_exp(selector, ctx));
-				let result_state = build_state(eval_exp(result, ctx));
-				while dims.len() < state.len() {
-					dims.push(vec![]);
-				}
-				for (i, s) in state.iter().enumerate() {
-					if !::num::Zero::is_zero(s) {
-						let mut dim = dims[i].clone().pad(result_state.len());
-						for (j, r) in result_state.iter().enumerate() {
-							dim[j] += r;
+			let mut def: State = vec![];
+			for (i, case) in cases.iter().rev().enumerate() {
+				match case {
+					&Case::Exp(ref selector, ref result) => {
+						let state = build_state(eval_exp(selector, ctx));
+						let result_state = build_state(eval_exp(result, ctx));
+						while dims.len() < state.len() {
+							dims.push(def.clone());
 						}
-						dims[i] = dim;
-					}
+						for (i, s) in state.iter().enumerate() {
+							if !::num::Zero::is_zero(s) {
+								dims[i] = result_state.clone();
+							}
+						}
+					},
+					&Case::Default(ref result) => {
+						if i > 0 {
+							panic!("`_` must be the final case");
+						}
+						else {
+							def = build_state(eval_exp(result, ctx));
+						}
+					},
 				}
 			}
 			RunVal::State(state.extract(dims))
@@ -128,8 +145,8 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 
 pub fn eval_decl(decl: &Decl, ctx: &mut Context) {
 	match decl {
-		&Decl::Data(ref id, ref choices) => {
-			let dt = DataType {choices: choices.clone()};
+		&Decl::Data(ref id, ref variants) => {
+			let dt = DataType {variants: variants.clone()};
 			ctx.add_data(id.clone(), dt);
 		},
 		&Decl::Let(ref pat, ref exp) => match assign_pat(pat, &eval_exp(exp, ctx), ctx) {
@@ -141,10 +158,10 @@ pub fn eval_decl(decl: &Decl, ctx: &mut Context) {
 
 pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Result<(), Error> {
 	match (pat, val) {
-		(&Pat::Unit, &RunVal::Unit) => Ok(()),
+		(&Pat::Wildcard, _) => {Ok(())},
 		(&Pat::Var(ref id), _) => {ctx.add_var(id.clone(), val.clone()); Ok(())},
 		(&Pat::Tuple(ref pats), &RunVal::Tuple(ref vals)) => {
-			if pats.len() != vals.len() {Err(format!("Invalid tuple length"))}
+			if pats.len() != vals.len() {Err(format!("Cannot deconstruct {} values from value: {}", pats.len(), val))}
 			else {
 				for (pat, val) in pats.iter().zip(vals) {
 					assign_pat(pat, val, ctx);
@@ -156,11 +173,32 @@ pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Result<(), Erro
 	}
 }
 
+// pub fn resolve_index(val: &Pat) -> Option<(usize, usize)> {
+// 	match val {
+// 		&RunVal::Data(ref dt, ref index) => Some((dt.variants.len(), *index)),
+// 		&RunVal::Tuple(ref vals) => {
+// 			let mut acc = (1, 0);
+// 			for val in vals {
+// 				match resolve_index(val) {
+// 					Some((s2, i2)) => {
+// 						let (s1, i1) = acc;
+// 						acc = (s1 * i1, s2 * i1 + i2);
+// 					},
+// 					None => return None,
+// 				}
+// 			}
+// 			Some(acc)
+// 		},
+// 		_ => None,
+// 	}
+// }
+
 pub fn build_state(val: RunVal) -> State {
 	match val {
-		RunVal::Unit => vec![],
-		RunVal::Data(dt, index) => get_state(index).pad(dt.choices.len()),
+		RunVal::Data(dt, index) => get_state(index).pad(dt.variants.len()),
 		RunVal::Tuple(vals) => vals.into_iter().fold(get_state(0), move |a, b| a.combine(build_state(b))),
+		RunVal::Func(pat, body) => unimplemented!(),
 		RunVal::State(state) => state,
+		RunVal::Error(err) => panic!(err),
 	}
 }

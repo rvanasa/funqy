@@ -1,8 +1,15 @@
 data Bool = F | T
 
-let (abc, def) = ((F, T), T)
+let (abc, qwe) = ((F, T), T)
 
-extract abc {
-	(F, T) => (T, T)
-	(T, F) => (F, F)
+fn not = {
+	F => T
+	T => F
 }
+
+fn equal = {
+	(F, F) | (T, T) => T
+	_ => F
+}
+
+equal(T, T)
