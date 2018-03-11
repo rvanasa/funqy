@@ -5,7 +5,25 @@ use std::fmt;
 use std::rc::Rc;
 use std::collections::HashMap;
 
-type Error = String;
+pub type Error = String;
+
+#[derive(Clone)]
+pub struct Macro(pub Ident, pub Rc<Fn(&Exp) -> Exp>);
+
+impl fmt::Debug for Macro {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "#{}", self.0)
+	}
+}
+
+impl PartialEq for Macro {
+	fn eq(&self, other: &Self) -> bool {
+		self.0 == other.0
+	}
+	fn ne(&self, other: &Self) -> bool {
+		self.0 != other.0
+	}
+}
 
 type RunValRc = Rc<RunVal>;
 #[derive(Clone,Debug,PartialEq)]
@@ -14,6 +32,7 @@ pub enum RunVal {
 	Tuple(Vec<RunVal>),
 	State(State),
 	Func(Pat, Exp),
+	Macro(Macro),
 	Error(Error),
 }
 
@@ -21,12 +40,20 @@ impl fmt::Display for RunVal {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			&RunVal::Data(ref dt, ref index) => write!(f, "{}", dt.variants[*index]),
-			&RunVal::Tuple(ref vals) => write!(f, "({})", vals.iter().map(move |val| format!("{}", val)).collect::<Vec<String>>().join(", ")),
+			&RunVal::Tuple(ref vals) => write!(f, "({})", vals.iter().map(|val| format!("{}", val)).collect::<Vec<String>>().join(", ")),
 			&RunVal::Func(ref pat, ref body) => write!(f, "{:?} -> {:?}", pat, body),
-			&RunVal::State(ref state) => write!(f, "[{}]", state.iter().map(move |index| format!("{}", index)).collect::<Vec<String>>().join(", ")),
+			&RunVal::Macro(ref mc) => write!(f, "{:?}", mc),
+			&RunVal::State(ref state) => write!(f, "[{}]", state.iter().map(|d| format!("{}", round(*d, 4))).collect::<Vec<String>>().join(", ")),
 			&RunVal::Error(ref err) => write!(f, "<<{}>>", err),
 		}
 	}
+}
+
+fn round(f: Cf32, d: i32) -> Cf32 {
+	use num::complex::Complex;
+	let m = Complex::new(10_f32.powi(d), 0_f32);
+	let f = f * m;
+	Complex::new(f.re.round(), f.im.round()) / m
 }
 
 #[derive(Clone,Debug,PartialEq)]
@@ -70,6 +97,10 @@ impl Context {
 	pub fn find_data(&self, id: &Ident) -> DataType {
 		unwrap("Data value", id, self.datatypes.get(id))
 	}
+	
+	pub fn add_macro(&mut self, id: &str, handle: &'static Fn(&Exp) -> Exp) {
+		self.add_var(id.to_string(), RunVal::Macro(Macro(id.to_string(), Rc::new(handle))))
+	}
 }
 
 fn unwrap<T:Clone>(cat: &str, id: &Ident, opt: Option<&T>) -> T {
@@ -87,7 +118,7 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 			eval_exp(ret, &child)
 		},
 		&Exp::Tuple(ref args) => RunVal::Tuple(args.iter()
-			.map(move |arg| eval_exp(arg, ctx))
+			.map(|arg| eval_exp(arg, ctx))
 			.collect()),
 		&Exp::Lambda(ref pat, ref body) => RunVal::Func(pat.clone(), (**body).clone()),
 		&Exp::Invoke(ref target, ref arg) => {
@@ -97,6 +128,7 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 					assign_pat(&pat, &eval_exp(arg, ctx), &mut child).unwrap();
 					eval_exp(&body, &child)
 				},
+				RunVal::Macro(Macro(_, handle)) => eval_exp(&handle(arg), ctx),
 				val => RunVal::Error(format!("Cannot invoke {}", val)),
 			}
 		},
@@ -131,10 +163,11 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 			}
 			RunVal::State(state.extract(dims))
 		},
-		&Exp::Sup(ref exp_a, ref exp_b) => {
-			let a = build_state(eval_exp(exp_a, ctx));
-			let b = build_state(eval_exp(exp_b, ctx));
-			RunVal::State(a.sup(b))
+		&Exp::Sup(ref args) => {
+			RunVal::State(create_sup(args.iter().map(|arg| build_state(eval_exp(arg, ctx))).collect()))
+		},
+		&Exp::PhaseFlip(ref arg) => {
+			RunVal::State(build_state(eval_exp(arg, ctx)).phase_flip())
 		},
 		&Exp::Measure(ref arg) => match eval_exp(arg, ctx) {
 			RunVal::State(ref state) => RunVal::State(get_state(state.measure())),
@@ -203,8 +236,9 @@ pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Result<(), Erro
 pub fn build_state(val: RunVal) -> State {
 	match val {
 		RunVal::Data(dt, index) => get_state(index).pad(dt.variants.len()),
-		RunVal::Tuple(vals) => vals.into_iter().fold(get_state(0), move |a, b| a.combine(build_state(b))),
-		RunVal::Func(pat, body) => unimplemented!(),
+		RunVal::Tuple(vals) => vals.into_iter().fold(get_state(0), |a, b| a.combine(build_state(b))),
+		RunVal::Func(_pat, _body) => unimplemented!(),
+		RunVal::Macro(_mc) => unimplemented!(),
 		RunVal::State(state) => state,
 		RunVal::Error(err) => panic!(err),
 	}

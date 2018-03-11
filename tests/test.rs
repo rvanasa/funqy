@@ -5,25 +5,27 @@ use funqy::engine::*;
 use funqy::eval::*;
 use funqy::parser::*;
 
-use std::rc::Rc;
-
-extern crate num;
-use num::complex::Complex;
-
-fn round(f: Cf32, d: i32) -> Cf32 {
-	let m = real!(10_f32.powi(d));
-	let f = f * m;
-	Complex::new(f.re.round(), f.im.round()) / m
-}
-
 #[test]
 fn test_parser() {
+
+	fn lib_sup(exp: &Exp) -> Exp {
+		match exp {
+			&Exp::Tuple(ref args) => Exp::Sup(args.clone()),
+			_ => exp.clone(),
+		}
+	}
+	
+	fn lib_phf(exp: &Exp) -> Exp {
+		Exp::PhaseFlip(std::rc::Rc::new(exp.clone()))
+	}
 	
 	let exp = parse_file("tests/scripts/Test.fqy").expect("Could not parse file");
-	let ctx = Context::new();
+	let mut ctx = Context::new();
+	ctx.add_macro("sup", &lib_sup);
+	ctx.add_macro("phf", &lib_phf);
 	
 	println!("{:?}", exp);
-	println!(">> {}", eval_exp(&exp, &ctx));
+	println!("\n >> {}\n", eval_exp(&exp, &ctx));
 }
 
 // #[test]
@@ -112,12 +114,12 @@ fn test_engine() {
 	// let s = a.sup(b);
 	let s = a.sup(get_state(1).phase_flip()).sup(get_state(2)).extract(vec![b, c]);
 	
-	let mut i = 0;
-	let mag = s.iter().fold(real!(0), move |a, b| a + (b * b));
-	println!("State: [{}] ({})", s.len(), mag);
-	for x in s {
-		let pow = if num::traits::Zero::is_zero(&x) {real!(0)} else {x * x};
-		println!("{}  {}%\t{} ", i, (pow * real!(100) / mag).re.round() as usize, round(x, 4));
-		i += 1;
-	}
+	// let mut i = 0;
+	// let mag = s.iter().fold(real!(0), |a, b| a + (b * b));
+	// println!("State: [{}] ({})", s.len(), mag);
+	// for x in s {
+	// 	let pow = if num::traits::Zero::is_zero(&x) {real!(0)} else {x * x};
+	// 	println!("{}  {}%\t{} ", i, (pow * real!(100) / mag).re.round() as usize, round(x, 4));
+	// 	i += 1;
+	// }
 }

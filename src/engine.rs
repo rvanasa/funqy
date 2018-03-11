@@ -47,13 +47,14 @@ impl Stateful for State {
 	}
 	
 	fn sup(self, s: State) -> State {
-		zip(self, s, move |x, y| x + y)
+		// zip(self, s, |x, y| (x + y) / real!(2).sqrt())
+		create_sup(vec![self, s])
 	}
 	
 	fn extract(self, vs: Vec<State>) -> State {
-		self.into_iter().zip(vs).map(move |(x, s)| {
-			s.iter().map(move |y| x * y).collect()
-		}).fold(vec![], move |t, s: State| {
+		self.into_iter().zip(vs).map(|(x, s)| {
+			s.iter().map(|y| x * y).collect()
+		}).fold(vec![], |t, s: State| {
 			let mut t = t;
 			while t.len() < s.len() {
 				t.push(real!(0));
@@ -66,7 +67,7 @@ impl Stateful for State {
 	}
 	
 	fn phase_flip(self) -> State {
-		self.into_iter().map(move |x| -x).collect()
+		self.into_iter().map(|x| -x).collect()
 	}
 	
 	fn measure(&self) -> usize {
@@ -83,9 +84,16 @@ impl Stateful for State {
 	}
 }
 
+// Create a superposition of the given states
+pub fn create_sup(states: Vec<State>) -> State {
+	let len = states.len();
+	states.into_iter().fold(vec![], |a, b| zip(a, b, |x, y| x + y))
+		.into_iter().map(|x| x / real!(len).sqrt()).collect()
+}
+
 // fn normalize(state: State) -> State {
-// 	let mag = state.iter().fold(real!(0), move |a, b| a + (b * b));
-// 	state.into_iter().map(move |x| x / mag.sqrt()).collect()
+// 	let mag = state.iter().fold(real!(0), |a, b| a + (b * b));
+// 	state.into_iter().map(|x| x / mag.sqrt()).collect()
 // }
 
 // Create a unit vector state in the given Hilbert dimension

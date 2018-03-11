@@ -34,7 +34,8 @@ pub enum Exp {
 	Invoke(ExpRc, ExpRc),
 	State(ExpRc),
 	Extract(ExpRc, Vec<Case>),
-	Sup(ExpRc, ExpRc),
+	Sup(Vec<Exp>),
+	PhaseFlip(ExpRc),
 	Measure(ExpRc),
 }
 

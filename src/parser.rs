@@ -12,15 +12,19 @@ pub type Error = String;
 // 	($id:tt) => {ws!(tag!($id))};
 // }
 
-named!(ident<String>, ws!(map!( // TODO ensure first char is non-numeric
+named!(name_ident<String>, ws!(map!( // TODO ensure first char is non-numeric
 	map_res!(take_while1!(nom::is_alphanumeric), ::std::str::from_utf8),
 	|s| s.to_string()
 )));
 
-named!(opr<String>, ws!(map!(
+named!(opr_ident<String>, ws!(map!(
 	map_res!(take_while1!(|c| "~!@#$%^&*/-+".contains(c as char)), ::std::str::from_utf8),
 	|s| s.to_string()
 )));
+
+named!(ident<String>,
+	alt!(name_ident | delimited!(ws!(tag!("(")), opr_ident, ws!(tag!(")"))))
+);
 
 named!(var_exp<Exp>, map!(
 	ident,
@@ -63,23 +67,26 @@ named!(extract_cases<Vec<Case>>, map!(
 		many0!(case),
 		ws!(tag!("}"))
 	),
-	|vec| vec.into_iter().flat_map(move |c| c).collect()
+	|vec| vec.into_iter().flat_map(|c| c).collect()
 ));
 
 named!(default_case<Vec<Case>>, do_parse!(
 	ws!(tag!("_")) >>
-	ws!(tag!("=>")) >>
-	result: exp >>
-	opt!(ws!(tag!(","))) >>
+	result: case_result >>
 	(vec![Case::Default(result)])
 ));
 
 named!(exp_case<Vec<Case>>, do_parse!(
 	selectors: separated_list!(ws!(tag!("|")), exp) >>
+	result: case_result >>
+	(selectors.into_iter().map(|selector| Case::Exp(selector, result.clone())).collect())
+));
+
+named!(case_result<Exp>, do_parse!(
 	ws!(tag!("=>")) >>
 	result: exp >>
 	opt!(ws!(tag!(","))) >>
-	(selectors.into_iter().map(|selector| Case::Exp(selector, result.clone())).collect())
+	(result)
 ));
 
 named!(case<Vec<Case>>,
@@ -87,7 +94,7 @@ named!(case<Vec<Case>>,
 );
 
 named!(prefix_opr_exp<Exp>, do_parse!(
-	opr: opr >>
+	opr: opr_ident >>
 	exp: exp >>
 	(Exp::Invoke(Rc::new(Exp::Var(opr)), Rc::new(exp)))
 ));
@@ -99,7 +106,7 @@ named!(path_exp<Exp>,
 named!(target_exp<Exp>, do_parse!(
 	path: path_exp >>
 	invokes: many0!(tuple_exp) >>
-	(invokes.into_iter().fold(path, move |a, b| Exp::Invoke(Rc::new(a), Rc::new(b))))
+	(invokes.into_iter().fold(path, |a, b| Exp::Invoke(Rc::new(a), Rc::new(b))))
 ));
 
 named!(exp<Exp>,
@@ -123,7 +130,8 @@ named!(data_decl<Decl>, do_parse!(
 
 named!(func_decl<Decl>, do_parse!(
 	ws!(tag!("fn")) >>
-	id: alt!(ident | delimited!(ws!(tag!("(")), opr, ws!(tag!(")")))) >>
+	// id: alt!(ident | delimited!(ws!(tag!("(")), opr, ws!(tag!(")")))) >>
+	id: ident >>
 	part: func_part >>
 	(Decl::Let(Pat::Var(id), part))
 ));
@@ -138,7 +146,7 @@ named!(func_basic_part<Exp>, do_parse!(
 named!(func_extract_part<Exp>, do_parse!(
 	ws!(tag!("=")) >>
 	cases: extract_cases >>
-	(Exp::Lambda(Pat::Var("@arg".to_string()), Rc::new(Exp::Extract(Rc::new(Exp::Var("@arg".to_string())), cases))))
+	(Exp::Lambda(Pat::Var("$arg".to_string()), Rc::new(Exp::Extract(Rc::new(Exp::Var("$arg".to_string())), cases))))
 ));
 
 named!(func_part<Exp>,
