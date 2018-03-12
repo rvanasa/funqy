@@ -101,12 +101,6 @@ named!(lambda_exp<Exp>, do_parse!(
 	(Exp::Lambda(pat, Rc::new(exp)))
 ));
 
-named!(prefix_opr_exp<Exp>, do_parse!(
-	opr: opr_ident >>
-	exp: exp >>
-	(Exp::Invoke(Rc::new(Exp::Var(opr)), Rc::new(exp)))
-));
-
 named!(path_exp<Exp>,
 	alt!(extract_exp | var_exp | tuple_exp | block_exp | lambda_exp)
 );
@@ -115,6 +109,12 @@ named!(decorated_exp<Exp>, do_parse!(
 	path: path_exp >>
 	invokes: many0!(tuple_exp) >>
 	(invokes.into_iter().fold(path, |a, b| Exp::Invoke(Rc::new(a), Rc::new(b))))
+));
+
+named!(prefix_opr_exp<Exp>, do_parse!(
+	opr: opr_ident >>
+	exp: target_exp >>
+	(Exp::Invoke(Rc::new(Exp::Var(opr)), Rc::new(exp)))
 ));
 
 named!(target_exp<Exp>,
