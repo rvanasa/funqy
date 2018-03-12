@@ -32,7 +32,7 @@ pub enum RunVal {
 	Data(DataType, usize), // TODO replace cloning with reference
 	Tuple(Vec<RunVal>),
 	State(State),
-	Func(Pat, Exp),
+	Func(Rc<Context>, Pat, Exp),
 	Macro(Macro),
 	Error(Error),
 }
@@ -43,7 +43,7 @@ impl fmt::Display for RunVal {
 			&RunVal::Index(ref n) => write!(f, "{}", n),
 			&RunVal::Data(ref dt, ref index) => write!(f, "{}", dt.variants[*index]),
 			&RunVal::Tuple(ref vals) => write!(f, "({})", vals.iter().map(|val| format!("{}", val)).collect::<Vec<String>>().join(", ")),
-			&RunVal::Func(ref pat, ref body) => write!(f, "{:?} -> {:?}", pat, body),
+			&RunVal::Func(ref pat, ref _ctx, ref body) => write!(f, "(..) -> {:?}", body),
 			&RunVal::Macro(ref mc) => write!(f, "{:?}", mc),
 			&RunVal::State(ref state) => write!(f, "{}", StateView(state)),
 			&RunVal::Error(ref err) => write!(f, "<<{}>>", err),
@@ -56,7 +56,7 @@ pub struct DataType {
 	pub variants: Vec<Ident>,
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub struct Context {
 	vars: HashMap<Ident, RunVal>,
 	datatypes: HashMap<Ident, DataType>,
@@ -116,13 +116,16 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 		&Exp::Tuple(ref args) => RunVal::Tuple(args.iter()
 			.map(|arg| eval_exp(arg, ctx))
 			.collect()),
-		&Exp::Lambda(ref pat, ref body) => RunVal::Func(pat.clone(), (**body).clone()),
+		&Exp::Lambda(ref pat, ref body) => {
+			let mut fn_ctx = ctx.create_child(); // TODO optimize?
+			RunVal::Func(Rc::new(fn_ctx), pat.clone(), (**body).clone())
+		},
 		&Exp::Invoke(ref target, ref arg) => {
 			match eval_exp(target, ctx) {
-				RunVal::Func(pat, body) => {
-					let mut child = ctx.create_child();
-					assign_pat(&pat, &eval_exp(arg, ctx), &mut child).unwrap();
-					eval_exp(&body, &child)
+				RunVal::Func(fn_ctx_rc, pat, body) => {
+					let mut fn_ctx = (*fn_ctx_rc).clone();
+					assign_pat(&pat, &eval_exp(arg, ctx), &mut fn_ctx).unwrap();
+					eval_exp(&body, &fn_ctx)
 				},
 				RunVal::Macro(Macro(_, handle)) => handle(arg, ctx),
 				val => RunVal::Error(format!("Cannot invoke {}", val)),
@@ -184,7 +187,10 @@ pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Result<(), Erro
 			if pats.len() != vals.len() {Err(format!("Cannot deconstruct {} values from value: {}", pats.len(), val))}
 			else {
 				for (pat, val) in pats.iter().zip(vals) {
-					assign_pat(pat, val, ctx);
+					match assign_pat(pat, val, ctx) {
+						Ok(()) => {},
+						Err(err) => return Err(err),
+					}
 				}
 				Ok(())
 			}
@@ -218,7 +224,7 @@ pub fn build_state(val: RunVal) -> State {
 		RunVal::Index(n) => get_state(n),
 		RunVal::Data(dt, index) => get_state(index).pad(dt.variants.len()),
 		RunVal::Tuple(vals) => vals.into_iter().fold(get_state(0), |a, b| a.combine(build_state(b))),
-		RunVal::Func(_pat, _body) => unimplemented!(),
+		RunVal::Func(_ctx, _pat, _body) => unimplemented!(),
 		RunVal::Macro(_mc) => unimplemented!(),
 		RunVal::State(state) => state,
 		RunVal::Error(err) => panic!(err),

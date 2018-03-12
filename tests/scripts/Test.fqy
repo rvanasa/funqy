@@ -72,20 +72,19 @@ fn ibell = {
 
 assert @F : had(had(F))
 
-data Dense = A | B | C | D
-
-fn kron(a, b, s) = extract s {
+fn kron(a, b) = |s| extract s {
 	(F, F) => (a(F), b(F)),
 	(F, T) => (a(F), b(T)),
 	(T, F) => (a(T), b(F)),
 	(T, T) => (a(T), b(T)),
 }
+let (<>) = kron
 
 fn encode(s, n) = extract n {
 	0 => s,
-	1 => kron(id, (!), s),
-	2 => kron(id, rz, s),
-	3 => kron(id, |a| !rz(a), s),
+	1 => s >> (id <> (!)),
+	2 => s >> (id <> rz),
+	3 => s >> (id <> |a| !rz(a)),
 }
 
 fn decode(s) = measure(ibell(s))
