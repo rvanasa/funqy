@@ -13,9 +13,7 @@ fn parallel = {
 	_ => F,
 }
 
-fn (@)(s) = extract s {
-	_ => s,
-}
+let (@) = |s| sup(s)
 
 fn (!) = {
 	F => T,
@@ -28,9 +26,12 @@ assert @T : !equal(F, T)
 let (^) = sup
 let (~) = phf
 
+assert F ^ T : T ^ F
+assert F ^ T : @(F ^ T)
+
 fn had = {
-	F => ^(F, T),
-	T => ^(F, ~T),
+	F => F ^ T,
+	T => F ^ ~T,
 }
 
 fn cnot(a, b) = extract a {
@@ -41,6 +42,8 @@ fn cnot(a, b) = extract a {
 let (#) = had
 let (*!) = cnot
 
-fn bell(a, b) = *!(#a, b)
+fn bell(a, b) = #a *! b
+
+print had(had(F))
 
 bell(F, F)

@@ -20,6 +20,7 @@ pub enum Decl {
 	// Type(Ident, Type),
 	Let(Pat, Exp),
 	Assert(Exp, Exp),
+	Print(Exp),
 	// Func(Pat, Exp),
 }
 
@@ -34,8 +35,6 @@ pub enum Exp {
 	Invoke(ExpRc, ExpRc),
 	State(ExpRc),
 	Extract(ExpRc, Vec<Case>),
-	Sup(Vec<Exp>),
-	PhaseFlip(ExpRc),
 	Measure(ExpRc),
 }
 

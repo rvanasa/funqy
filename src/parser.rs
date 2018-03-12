@@ -93,6 +93,14 @@ named!(case<Vec<Case>>,
 	alt!(default_case | exp_case)
 );
 
+named!(lambda_exp<Exp>, do_parse!(
+	ws!(tag!("|")) >>
+	pat: pat >>
+	ws!(tag!("|")) >>
+	exp: exp >>
+	(Exp::Lambda(pat, Rc::new(exp)))
+));
+
 named!(prefix_opr_exp<Exp>, do_parse!(
 	opr: opr_ident >>
 	exp: exp >>
@@ -100,17 +108,27 @@ named!(prefix_opr_exp<Exp>, do_parse!(
 ));
 
 named!(path_exp<Exp>,
-	alt!(extract_exp | var_exp | tuple_exp | block_exp)
+	alt!(extract_exp | var_exp | tuple_exp | block_exp | lambda_exp)
 );
 
-named!(target_exp<Exp>, do_parse!(
+named!(decorated_exp<Exp>, do_parse!(
 	path: path_exp >>
 	invokes: many0!(tuple_exp) >>
 	(invokes.into_iter().fold(path, |a, b| Exp::Invoke(Rc::new(a), Rc::new(b))))
 ));
 
-named!(exp<Exp>,
-	alt!(prefix_opr_exp | target_exp));
+named!(target_exp<Exp>,
+	alt!(prefix_opr_exp | decorated_exp)
+);
+
+named!(exp<Exp>, do_parse!(
+	exp: target_exp >>
+	infixes: many0!(tuple!(opr_ident, target_exp)) >>
+	(infixes.into_iter().fold(exp, |a, (opr, b)| Exp::Invoke(
+		Rc::new(Exp::Var(opr)),
+		Rc::new(Exp::Tuple(vec![a, b])),
+	)))
+));
 
 named!(let_decl<Decl>, do_parse!(
 	ws!(tag!("let")) >>
@@ -126,6 +144,11 @@ named!(data_decl<Decl>, do_parse!(
 	ws!(tag!("=")) >>
 	variants: separated_list!(ws!(tag!("|")), data_val) >>
 	(Decl::Data(id, variants))
+));
+
+named!(data_val<Ident>, do_parse!(
+	id: ident >>
+	(id)
 ));
 
 named!(func_decl<Decl>, do_parse!(
@@ -161,13 +184,14 @@ named!(assert_decl<Decl>, do_parse!(
 	(Decl::Assert(expect, result))
 ));
 
-named!(data_val<Ident>, do_parse!(
-	id: ident >>
-	(id)
+named!(print_decl<Decl>, do_parse!(
+	ws!(tag!("print")) >>
+	exp: exp >>
+	(Decl::Print(exp))
 ));
 
 named!(decl<Decl>,
-	alt!(let_decl | data_decl | func_decl | assert_decl)
+	alt!(let_decl | data_decl | func_decl | assert_decl | print_decl)
 );
 
 named!(wildcard_pat<Pat>, do_parse!(

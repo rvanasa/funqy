@@ -17,6 +17,16 @@ macro_rules! imag {
 
 pub type State = Vec<Cf32>;
 
+pub trait DebugPrint {
+	fn print(&self);
+}
+
+impl DebugPrint for State {
+	fn print(&self) {
+		println!("{}", StateView(self));
+	}
+}
+
 pub trait Stateful
 where Self: ::std::marker::Sized {
 	fn pad(self, n: usize) -> Self;
@@ -28,12 +38,11 @@ where Self: ::std::marker::Sized {
 }
 
 impl Stateful for State {
-	fn pad(self, n: usize) -> State {
-		let mut state = self;
-		while state.len() < n {
-			state.push(real!(0));
+	fn pad(mut self, n: usize) -> State {
+		while self.len() < n {
+			self.push(real!(0));
 		}
-		state
+		self
 	}
 	
 	fn combine(self, s: State) -> State {
@@ -52,17 +61,10 @@ impl Stateful for State {
 	}
 	
 	fn extract(self, vs: Vec<State>) -> State {
-		self.into_iter().zip(vs).map(|(x, s)| {
+		// println!("{}  {:?}", StateView(&self),vs);////
+		create_sup(self.into_iter().zip(vs).map(|(x, s)| {
 			s.iter().map(|y| x * y).collect()
-		}).fold(vec![], |mut t, s: State| {
-			while t.len() < s.len() {
-				t.push(real!(0));
-			}
-			for i in 0..s.len() {
-				t[i] += s[i];
-			}
-			t
-		})
+		}).collect())
 	}
 	
 	fn phase_flip(self) -> State {
@@ -74,7 +76,7 @@ impl Stateful for State {
 		for (i, t) in self.iter().enumerate() {
 			weights.push(Weighted {
 				item: i,
-				weight: (t/*.abs()*/ * t).re as u32,
+				weight: (t/*.abs()*/ * t/*.abs()*/).re as u32,
 			});
 		}
 		let mut wc = WeightedChoice::new(&mut weights);
@@ -85,9 +87,11 @@ impl Stateful for State {
 
 // Create a superposition of the given states
 pub fn create_sup(states: Vec<State>) -> State {
-	let len = states.len();
+	let div = states.iter().map(|v| v.iter().fold(real!(0), |a, b| a + b * b))
+		.fold(real!(0), |a, b| a + b).sqrt();
+	
 	states.into_iter().fold(vec![], |a, b| zip(a, b, |x, y| x + y))
-		.into_iter().map(|x| x / real!(len).sqrt()).collect()
+		.into_iter().map(|x| x / div).collect()
 }
 
 // fn normalize(state: State) -> State {
@@ -124,4 +128,19 @@ where T: Fn(Cf32, Cf32) -> Cf32 {
 		state.push(f(a[i], b[i]));
 	}
 	state
+}
+
+use std::fmt;
+pub struct StateView<'a>(pub &'a State);
+impl<'a> fmt::Display for StateView<'a> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "[{}]", self.0.iter().map(|d| format!("{}", round(*d, 4))).collect::<Vec<String>>().join(", "))
+	}
+}
+
+fn round(f: Cf32, d: i32) -> Cf32 {
+	use num::complex::Complex;
+	let m = Complex::new(10_f32.powi(d), 0_f32);
+	let f = f * m;
+	Complex::new(f.re.round(), f.im.round()) / m
 }

@@ -8,15 +8,15 @@ use funqy::parser::*;
 #[test]
 fn test_parser() {
 
-	fn lib_sup(exp: &Exp) -> Exp {
-		match exp {
-			&Exp::Tuple(ref args) => Exp::Sup(args.clone()),
-			_ => exp.clone(),
-		}
+	fn lib_sup(exp: &Exp, ctx: &Context) -> RunVal {
+		RunVal::State(match exp {
+			&Exp::Tuple(ref args) => create_sup(args.iter().map(|arg| build_state(eval_exp(arg, ctx))).collect()),
+			_ => build_state(eval_exp(exp, ctx)),
+		})
 	}
 	
-	fn lib_phf(exp: &Exp) -> Exp {
-		Exp::PhaseFlip(std::rc::Rc::new(exp.clone()))
+	fn lib_phf(exp: &Exp, ctx: &Context) -> RunVal {
+		RunVal::State(build_state(eval_exp(exp, ctx)).phase_flip())
 	}
 	
 	let exp = parse_file("tests/scripts/Test.fqy").expect("Could not parse file");

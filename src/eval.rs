@@ -8,7 +8,7 @@ use std::collections::HashMap;
 pub type Error = String;
 
 #[derive(Clone)]
-pub struct Macro(pub Ident, pub Rc<Fn(&Exp) -> Exp>);
+pub struct Macro(pub Ident, pub Rc<Fn(&Exp, &Context) -> RunVal>);
 
 impl fmt::Debug for Macro {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -43,17 +43,10 @@ impl fmt::Display for RunVal {
 			&RunVal::Tuple(ref vals) => write!(f, "({})", vals.iter().map(|val| format!("{}", val)).collect::<Vec<String>>().join(", ")),
 			&RunVal::Func(ref pat, ref body) => write!(f, "{:?} -> {:?}", pat, body),
 			&RunVal::Macro(ref mc) => write!(f, "{:?}", mc),
-			&RunVal::State(ref state) => write!(f, "[{}]", state.iter().map(|d| format!("{}", round(*d, 4))).collect::<Vec<String>>().join(", ")),
+			&RunVal::State(ref state) => write!(f, "{}", StateView(state)),
 			&RunVal::Error(ref err) => write!(f, "<<{}>>", err),
 		}
 	}
-}
-
-fn round(f: Cf32, d: i32) -> Cf32 {
-	use num::complex::Complex;
-	let m = Complex::new(10_f32.powi(d), 0_f32);
-	let f = f * m;
-	Complex::new(f.re.round(), f.im.round()) / m
 }
 
 #[derive(Clone,Debug,PartialEq)]
@@ -98,7 +91,7 @@ impl Context {
 		unwrap("Data value", id, self.datatypes.get(id))
 	}
 	
-	pub fn add_macro(&mut self, id: &str, handle: &'static Fn(&Exp) -> Exp) {
+	pub fn add_macro(&mut self, id: &str, handle: &'static Fn(&Exp, &Context) -> RunVal) {
 		self.add_var(id.to_string(), RunVal::Macro(Macro(id.to_string(), Rc::new(handle))))
 	}
 }
@@ -128,7 +121,7 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 					assign_pat(&pat, &eval_exp(arg, ctx), &mut child).unwrap();
 					eval_exp(&body, &child)
 				},
-				RunVal::Macro(Macro(_, handle)) => eval_exp(&handle(arg), ctx),
+				RunVal::Macro(Macro(_, handle)) => handle(arg, ctx),
 				val => RunVal::Error(format!("Cannot invoke {}", val)),
 			}
 		},
@@ -159,12 +152,6 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 			}
 			RunVal::State(state.extract(dims))
 		},
-		&Exp::Sup(ref args) => {
-			RunVal::State(create_sup(args.iter().map(|arg| build_state(eval_exp(arg, ctx))).collect()))
-		},
-		&Exp::PhaseFlip(ref arg) => {
-			RunVal::State(build_state(eval_exp(arg, ctx)).phase_flip())
-		},
 		&Exp::Measure(ref arg) => match eval_exp(arg, ctx) {
 			RunVal::State(ref state) => RunVal::State(get_state(state.measure())),
 			val => val,
@@ -178,10 +165,7 @@ pub fn eval_decl(decl: &Decl, ctx: &mut Context) {
 			let dt = DataType {variants: variants.clone()};
 			ctx.add_data(id.clone(), dt);
 		},
-		&Decl::Let(ref pat, ref exp) => match assign_pat(pat, &eval_exp(exp, ctx), ctx) {
-			Err(err) => panic!(err),
-			_ => {},
-		},
+		&Decl::Let(ref pat, ref exp) => assign_pat(pat, &eval_exp(exp, ctx), ctx).unwrap(),
 		&Decl::Assert(ref expect, ref result) => {
 			let a = eval_exp(expect, ctx);
 			let b = eval_exp(result, ctx);
@@ -189,6 +173,7 @@ pub fn eval_decl(decl: &Decl, ctx: &mut Context) {
 				panic!("Assertion failed: {} != {}", a, b);
 			}
 		},
+		&Decl::Print(ref exp) => println!(":: {}", eval_exp(exp, ctx)),
 	}
 }
 
