@@ -28,6 +28,7 @@ pub enum Decl {
 type ExpRc = Rc<Exp>;
 #[derive(Clone,Debug,Eq,PartialEq)]
 pub enum Exp {
+	Literal(usize),
 	Var(Ident),
 	Scope(Vec<Decl>, ExpRc),
 	Tuple(Vec<Exp>),
@@ -35,7 +36,6 @@ pub enum Exp {
 	Invoke(ExpRc, ExpRc),
 	State(ExpRc),
 	Extract(ExpRc, Vec<Case>),
-	Measure(ExpRc),
 }
 
 #[derive(Clone,Debug,Eq,PartialEq)]

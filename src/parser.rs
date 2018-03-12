@@ -12,19 +12,29 @@ pub type Error = String;
 // 	($id:tt) => {ws!(tag!($id))};
 // }
 
-named!(name_ident<String>, ws!(map!( // TODO ensure first char is non-numeric
+named!(num_literal<usize>, ws!(map_res!(
+	map_res!(take_while1!(nom::is_digit), ::std::str::from_utf8),
+	|s: &str| s.parse()
+)));
+
+named!(name_ident<String>, ws!(map!(
 	map_res!(take_while1!(nom::is_alphanumeric), ::std::str::from_utf8),
 	|s| s.to_string()
 )));
 
 named!(opr_ident<String>, ws!(map!(
-	map_res!(take_while1!(|c| "~!@#%^&*/-+".contains(c as char)), ::std::str::from_utf8),
+	map_res!(take_while1!(|c| "~!@#%^&*/?-+<>".contains(c as char)), ::std::str::from_utf8),
 	|s| s.to_string()
 )));
 
 named!(ident<String>,
 	alt!(name_ident | delimited!(ws!(tag!("(")), opr_ident, ws!(tag!(")"))))
 );
+
+named!(literal_exp<Exp>, map!(
+	num_literal,
+	Exp::Literal
+));
 
 named!(var_exp<Exp>, map!(
 	ident,
@@ -49,7 +59,7 @@ named!(block_exp<Exp>,
 );
 
 named!(scope_exp<Exp>, do_parse!(
-	decls: many0!(decl) >>
+	decls: many0!(terminated!(decl, opt!(ws!(tag!(";"))))) >>
 	exp: exp >>
 	(Exp::Scope(decls, Rc::new(exp)))
 ));
@@ -102,7 +112,7 @@ named!(lambda_exp<Exp>, do_parse!(
 ));
 
 named!(path_exp<Exp>,
-	alt!(extract_exp | var_exp | tuple_exp | block_exp | lambda_exp)
+	alt!(extract_exp | literal_exp | var_exp | tuple_exp | block_exp | lambda_exp)
 );
 
 named!(decorated_exp<Exp>, do_parse!(
@@ -153,7 +163,6 @@ named!(data_val<Ident>, do_parse!(
 
 named!(func_decl<Decl>, do_parse!(
 	ws!(tag!("fn")) >>
-	// id: alt!(ident | delimited!(ws!(tag!("(")), opr, ws!(tag!(")")))) >>
 	id: ident >>
 	part: func_part >>
 	(Decl::Let(Pat::Var(id), part))

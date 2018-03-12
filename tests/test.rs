@@ -19,13 +19,18 @@ fn test_parser() {
 		RunVal::State(build_state(eval_exp(exp, ctx)).phase_flip())
 	}
 	
+	fn lib_measure(exp: &Exp, ctx: &Context) -> RunVal {
+		RunVal::Index(build_state(eval_exp(exp, ctx)).measure())
+	}
+	
 	let exp = parse_file("tests/scripts/Test.fqy").expect("Could not parse file");
 	let mut ctx = Context::new();
 	ctx.add_macro("sup", &lib_sup);
 	ctx.add_macro("phf", &lib_phf);
+	ctx.add_macro("measure", &lib_measure);
 	
 	println!("{:?}", exp);
-	println!("\n >> {}\n", eval_exp(&exp, &ctx));
+	println!("\n>> {}\n", eval_exp(&exp, &ctx));
 }
 
 // #[test]

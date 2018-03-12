@@ -28,6 +28,7 @@ impl PartialEq for Macro {
 type RunValRc = Rc<RunVal>;
 #[derive(Clone,Debug,PartialEq)]
 pub enum RunVal {
+	Index(usize),
 	Data(DataType, usize), // TODO replace cloning with reference
 	Tuple(Vec<RunVal>),
 	State(State),
@@ -39,6 +40,7 @@ pub enum RunVal {
 impl fmt::Display for RunVal {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
+			&RunVal::Index(ref n) => write!(f, "{}", n),
 			&RunVal::Data(ref dt, ref index) => write!(f, "{}", dt.variants[*index]),
 			&RunVal::Tuple(ref vals) => write!(f, "({})", vals.iter().map(|val| format!("{}", val)).collect::<Vec<String>>().join(", ")),
 			&RunVal::Func(ref pat, ref body) => write!(f, "{:?} -> {:?}", pat, body),
@@ -102,6 +104,7 @@ fn unwrap<T:Clone>(cat: &str, id: &Ident, opt: Option<&T>) -> T {
 
 pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 	match exp {
+		&Exp::Literal(ref n) => RunVal::Index(*n),
 		&Exp::Var(ref id) => ctx.find_var(id),
 		&Exp::Scope(ref decls, ref ret) => {
 			let mut child = ctx.create_child();
@@ -133,15 +136,15 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 				_ => vec![],
 			};
 			let mut dims: Vec<State> = vec![];
-			while dims.len() < state.len() {
-				dims.push(def.clone());
-			}
 			for (i, case) in cases.iter().rev().enumerate() {
 				match case {
 					&Case::Exp(ref selector, ref result) => {
-						let state = build_state(eval_exp(selector, ctx));
+						let selector_state = build_state(eval_exp(selector, ctx));
 						let result_state = build_state(eval_exp(result, ctx));
-						for (i, s) in state.iter().enumerate() {
+						while dims.len() < selector_state.len() {
+							dims.push(def.clone());
+						}
+						for (i, s) in selector_state.iter().enumerate() {
 							if !::num::Zero::is_zero(s) {
 								dims[i] = result_state.clone();
 							}
@@ -151,10 +154,6 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 				}
 			}
 			RunVal::State(state.extract(dims))
-		},
-		&Exp::Measure(ref arg) => match eval_exp(arg, ctx) {
-			RunVal::State(ref state) => RunVal::State(get_state(state.measure())),
-			val => val,
 		},
 	}
 }
@@ -216,6 +215,7 @@ pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Result<(), Erro
 
 pub fn build_state(val: RunVal) -> State {
 	match val {
+		RunVal::Index(n) => get_state(n),
 		RunVal::Data(dt, index) => get_state(index).pad(dt.variants.len()),
 		RunVal::Tuple(vals) => vals.into_iter().fold(get_state(0), |a, b| a.combine(build_state(b))),
 		RunVal::Func(_pat, _body) => unimplemented!(),

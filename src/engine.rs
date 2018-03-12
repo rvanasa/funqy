@@ -75,13 +75,14 @@ impl Stateful for State {
 		let mut weights = vec![];
 		for (i, t) in self.iter().enumerate() {
 			weights.push(Weighted {
+				weight: (real!(::std::u16::MAX) / (t/*abs*/ * t)).re as u32,
 				item: i,
-				weight: (t/*.abs()*/ * t/*.abs()*/).re as u32,
 			});
 		}
 		let mut wc = WeightedChoice::new(&mut weights);
 		let mut rng = thread_rng();
 		wc.sample(&mut rng)
+		// TODO persist measured value (fixed by universal no-cloning)
 	}
 }
 
