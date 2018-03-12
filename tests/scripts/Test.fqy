@@ -72,7 +72,7 @@ fn ibell = {
 
 assert @F : had(had(F))
 
-fn kron(a, b) = |s| extract s {
+fn kron(a, b)(s) = extract s {
 	(F, F) => (a(F), b(F)),
 	(F, T) => (a(F), b(T)),
 	(T, F) => (a(T), b(F)),
@@ -93,5 +93,7 @@ let data = 1
 let shared = encode(bell(F, F), data)
 
 print ibell(shared)
+
+
 
 decode(shared)

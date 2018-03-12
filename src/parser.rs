@@ -169,10 +169,10 @@ named!(func_decl<Decl>, do_parse!(
 ));
 
 named!(func_basic_part<Exp>, do_parse!(
-	pat: tuple_pat >>
+	pat: many1!(tuple_pat) >>
 	ws!(tag!("=")) >>
 	body: exp >>
-	(Exp::Lambda(pat, Rc::new(body)))
+	(pat.into_iter().rev().fold(body, |exp, pat| Exp::Lambda(pat, Rc::new(exp))))
 ));
 
 named!(func_extract_part<Exp>, do_parse!(
