@@ -12,7 +12,7 @@ pub type Error = String;
 // 	($id:tt) => {ws!(tag!($id))};
 // }
 
-named!(num_literal<usize>, ws!(map_res!(
+named!(nat_literal<usize>, ws!(map_res!(
 	map_res!(take_while1!(nom::is_digit), ::std::str::from_utf8),
 	|s: &str| s.parse()
 )));
@@ -32,7 +32,7 @@ named!(ident<String>,
 );
 
 named!(literal_exp<Exp>, map!(
-	num_literal,
+	nat_literal,
 	Exp::Literal
 ));
 
@@ -104,15 +104,38 @@ named!(case<Vec<Case>>,
 );
 
 named!(lambda_exp<Exp>, do_parse!(
-	ws!(tag!("|")) >>
-	pat: pat >>
-	ws!(tag!("|")) >>
+	pat: delimited!(
+		ws!(tag!("|")),
+		pat,
+		ws!(tag!("|"))
+	) >>
 	exp: exp >>
 	(Exp::Lambda(pat, Rc::new(exp)))
 ));
 
+named!(phase_exp<Exp>, do_parse!(
+	phase: delimited!(
+		ws!(tag!("[")),
+		phase,
+		ws!(tag!("]"))
+	) >>
+	exp: exp >>
+	(Exp::Phase(phase, Rc::new(exp)))
+));
+
+named!(phase<::engine::Phase>, do_parse!(
+	num: nat_literal >>
+	size: alt!(
+		value!(100_f32, ws!(tag!("%"))) |
+		value!(180_f32, ws!(tag!("d"))) |
+		value!(1_f32, ws!(tag!("r"))) |
+		value!(::std::f32::consts::PI)
+	) >>
+	(num as f32 * ::std::f32::consts::PI / size)
+));
+
 named!(path_exp<Exp>,
-	alt!(extract_exp | literal_exp | var_exp | tuple_exp | block_exp | lambda_exp)
+	alt!(extract_exp | literal_exp | var_exp | tuple_exp | block_exp | phase_exp | lambda_exp)
 );
 
 named!(decorated_exp<Exp>, do_parse!(

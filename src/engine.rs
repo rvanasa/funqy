@@ -16,6 +16,7 @@ macro_rules! imag {
 }
 
 pub type State = Vec<Cf32>;
+pub type Phase = f32;
 
 pub trait DebugPrint {
 	fn print(&self);
@@ -33,8 +34,9 @@ where Self: ::std::marker::Sized {
 	fn combine(self, s: Self) -> Self;
 	fn sup(self, s: Self) -> Self;
 	fn extract(self, vs: Vec<Self>) -> Self;
+	fn phase(self, p: Phase) -> Self;
 	fn phase_flip(self) -> Self;
-	fn measure(&self) -> usize;
+	fn measure(self) -> usize;
 }
 
 impl Stateful for State {
@@ -61,21 +63,27 @@ impl Stateful for State {
 	}
 	
 	fn extract(self, vs: Vec<State>) -> State {
-		// println!("{}  {:?}", StateView(&self),vs);////
 		create_sup(self.into_iter().zip(vs).map(|(x, s)| {
 			s.iter().map(|y| x * y).collect()
 		}).collect())
+	}
+	
+	fn phase(self, p: Phase) -> State {
+		let (cos, sin) = (p.cos(), p.sin());
+		self.into_iter().map(|x| Complex::new(
+			cos * x.re + sin * x.im,
+			sin * x.re + cos * x.im)).collect()
 	}
 	
 	fn phase_flip(self) -> State {
 		self.into_iter().map(|x| -x).collect()
 	}
 	
-	fn measure(&self) -> usize {
+	fn measure(self) -> usize {
 		let mut weights = vec![];
-		for (i, t) in self.iter().enumerate() {
+		for (i, n) in self.into_iter().enumerate() {
 			weights.push(Weighted {
-				weight: (real!(::std::u16::MAX) / (t/*abs*/ * t)).re as u32,
+				weight: (::std::u16::MAX as f32 / absq(n)) as u32,
 				item: i,
 			});
 		}
@@ -88,8 +96,8 @@ impl Stateful for State {
 
 // Create a superposition of the given states
 pub fn create_sup(states: Vec<State>) -> State {
-	let div = states.iter().map(|v| v.iter().fold(real!(0), |a, b| a + b * b))
-		.fold(real!(0), |a, b| a + b).sqrt();
+	let div = states.iter().map(|v| v.iter().fold(0_f32, |a, b| a + absq(*b)))
+		.fold(0_f32, |a, b| a + b).sqrt();
 	
 	states.into_iter().fold(vec![], |a, b| zip(a, b, |x, y| x + y))
 		.into_iter().map(|x| x / div).collect()
@@ -102,6 +110,9 @@ pub fn create_sup(states: Vec<State>) -> State {
 
 // Create a unit vector state in the given Hilbert dimension
 pub fn get_state(n: usize) -> State {
+	if n < 0 /* || n >= max_state_size */ {
+		panic!("Invalid state size: {}", n);
+	}
 	let mut state = vec![];
 	for i in 0..n {
 		state.push(real!(0));
@@ -129,6 +140,10 @@ where T: Fn(Cf32, Cf32) -> Cf32 {
 		state.push(f(a[i], b[i]));
 	}
 	state
+}
+
+fn absq(n: Cf32) -> f32 {
+	n.re * n.re + n.im * n.im
 }
 
 use std::fmt;

@@ -132,6 +132,7 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 			}
 		},
 		&Exp::State(ref arg) => RunVal::State(build_state(eval_exp(arg, ctx))),
+		&Exp::Phase(ref phase, ref arg) => RunVal::State(build_state(eval_exp(arg, ctx)).phase(*phase)),
 		&Exp::Extract(ref arg, ref cases) => {
 			let state = build_state(eval_exp(arg, ctx));
 			let def: State = match cases.get(cases.len() - 1) {

@@ -4,7 +4,7 @@ pub type Ident = String;
 
 // Pattern (e.g. function parameters, match/extract cases)
 type PatRc = Rc<Pat>;
-#[derive(Clone,Debug,Eq,PartialEq)]
+#[derive(Clone,Debug,PartialEq)]
 pub enum Pat {
 	Wildcard,
 	Var(Ident),
@@ -14,7 +14,7 @@ pub enum Pat {
 
 // Scope declaration (statement)
 type DeclRc = Rc<Decl>;
-#[derive(Clone,Debug,Eq,PartialEq)]
+#[derive(Clone,Debug,PartialEq)]
 pub enum Decl {
 	Data(Ident, Vec<Ident>),
 	// Type(Ident, Type),
@@ -26,7 +26,7 @@ pub enum Decl {
 
 // Expression
 type ExpRc = Rc<Exp>;
-#[derive(Clone,Debug,Eq,PartialEq)]
+#[derive(Clone,Debug,PartialEq)]
 pub enum Exp {
 	Literal(usize),
 	Var(Ident),
@@ -35,10 +35,11 @@ pub enum Exp {
 	Lambda(Pat, ExpRc),
 	Invoke(ExpRc, ExpRc),
 	State(ExpRc),
+	Phase(::engine::Phase, ExpRc),
 	Extract(ExpRc, Vec<Case>),
 }
 
-#[derive(Clone,Debug,Eq,PartialEq)]
+#[derive(Clone,Debug,PartialEq)]
 pub enum Case {
 	Exp(Exp, Exp),
 	Default(Exp),

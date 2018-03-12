@@ -8,21 +8,17 @@ fn equal = {
 	_ => F,
 }
 
-fn parallel = {
-	(X, X) | (Y, Y) | (Z, Z) => T,
-	_ => F,
-}
-
 fn (>>)(a, b) = b(a)
 fn (<<)(a, b) = a(b)
 
 fn (@)(s) = sup(s)
 let (#) = measure
 
-fn (!) = {
+fn rx = {
 	F => T,
 	T => F,
 }
+let (!) = rx
 
 assert @T : equal(T, T)
 assert @T : !equal(F, T)
@@ -52,7 +48,6 @@ fn cnot(a, b) = extract a {
 	F => (F, b),
 	T => (T, !b),
 }
-
 let (*!) = cnot
 
 fn bellgate(a, b) = had(a) *! b
@@ -82,18 +77,31 @@ let (<>) = kron
 
 fn encode(s, n) = extract n {
 	0 => s,
-	1 => s >> (id <> (!)),
+	1 => s >> (id <> rx),
 	2 => s >> (id <> rz),
-	3 => s >> (id <> |a| !rz(a)),
+	3 => s >> (id <> |a| rx(rz(a))),
 }
 
 fn decode(s) = measure(ibell(s))
 
-let data = 1
+let data = 2
 let shared = encode(bell(F, F), data)
 
 print ibell(shared)
 
+assert data : decode(shared)
 
+fn ry = {
+	F => [50%] T,
+	T => [150%] F,
+}
 
-decode(shared)
+fn rotate(r)(s) = extract r {
+	X => rx(s),
+	Y => ry(s),
+	Z => rz(s),
+}
+
+print rotate(X ^ Z)(F)
+
+; rotate(X ^ ~Y)(T)
