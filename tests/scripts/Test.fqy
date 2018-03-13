@@ -99,4 +99,11 @@ fn rotate(r)(s) = extract r {
 
 assert had(F) : rotate(X ^ Z)(F)
 
-ibell(bell(F))
+fn cnot = {
+	(F, F) => (F, F),
+	(F, T) => (F, T),
+	(T, F) => (T, T),
+	(T, T) => (T, F),
+}
+
+; (F, F) >> (had, id) >> cnot

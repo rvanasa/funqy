@@ -44,7 +44,7 @@ impl fmt::Display for RunVal {
 			&RunVal::Index(ref n) => write!(f, "{}", n),
 			&RunVal::Data(ref dt, ref index) => write!(f, "{}", dt.variants[*index]),
 			&RunVal::Tuple(ref vals) => write!(f, "({})", vals.iter().map(|val| format!("{}", val)).collect::<Vec<String>>().join(", ")),
-			&RunVal::Func(ref pat, ref _ctx, ref body) => write!(f, "(..) -> {:?}", body),
+			&RunVal::Func(ref _ctx, ref _pat, ref _body) => write!(f, "(..) -> (..)"),
 			&RunVal::Macro(ref mc) => write!(f, "{:?}", mc),
 			&RunVal::State(ref state) => write!(f, "{}", StateView(state)),
 			&RunVal::Gate(ref gate) => write!(f, "[{}]", gate.iter().map(|state| format!("{}", StateView(state))).collect::<Vec<String>>().join(", ")),
@@ -106,7 +106,7 @@ fn unwrap<T:Clone>(cat: &str, id: &Ident, opt: Option<&T>) -> T {
 
 pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 	match exp {
-		&Exp::Literal(ref n) => RunVal::Index(*n),
+		&Exp::Literal(n) => RunVal::Index(n),
 		&Exp::Var(ref id) => ctx.find_var(id),
 		&Exp::Scope(ref decls, ref ret) => {
 			let mut child = ctx.create_child();
@@ -124,6 +124,11 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 		},
 		&Exp::Invoke(ref target, ref arg) => {
 			match eval_exp(target, ctx) {
+				RunVal::Tuple(fns) => {
+					let state = build_state(eval_exp(arg, ctx));
+					let gate = fns.into_iter().map(|f| eval_gate(f, ctx)).fold(vec![get_state(0)], |a, b| a.combine(b));
+					RunVal::State(state.extract(gate))
+				},
 				RunVal::Func(fn_ctx_rc, pat, body) => {
 					let mut fn_ctx = (*fn_ctx_rc).clone();
 					assign_pat(&pat, &eval_exp(arg, ctx), &mut fn_ctx).unwrap();
@@ -135,7 +140,7 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 			}
 		},
 		&Exp::State(ref arg) => RunVal::State(build_state(eval_exp(arg, ctx))),
-		&Exp::Phase(ref phase, ref arg) => RunVal::State(build_state(eval_exp(arg, ctx)).phase(*phase)),
+		&Exp::Phase(phase, ref arg) => RunVal::State(build_state(eval_exp(arg, ctx)).phase(phase)),
 		&Exp::Extract(ref arg, ref cases) => {
 			let state = build_state(eval_exp(arg, ctx));
 			let gate = extract_gate(cases, ctx);
@@ -208,7 +213,9 @@ pub fn eval_gate_body(exp: &Exp, ctx: &Context) -> Gate {
 pub fn eval_gate(val: RunVal, ctx: &Context) -> Gate {
 	match val {
 		RunVal::Tuple(vals) => unimplemented!(),
-		RunVal::Func(_ctx, _pat, body) => eval_gate_body(&body, ctx),
+		RunVal::Func(fn_ctx, _pat, body) => {
+			eval_gate_body(&body, &fn_ctx)
+		},
 		RunVal::Gate(gate) => gate,
 		_ => panic!(format!("Not a gate: {}", val)),
 	}
@@ -237,5 +244,7 @@ pub fn extract_gate(cases: &Vec<Case>, ctx: &Context) -> Gate {
 			&Case::Default(_) => {},
 		}
 	}
-	dims
+	//??
+	let max_len = dims.iter().map(|s| s.len()).max().unwrap_or_else(|| 0);
+	dims.into_iter().map(|s| s.pad(max_len)).collect()
 }

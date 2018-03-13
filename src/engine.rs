@@ -40,7 +40,6 @@ impl DebugPrint for Gate {
 pub trait Stateful
 where Self: ::std::marker::Sized {
 	fn pad(self, n: usize) -> Self;
-	fn combine(self, s: Self) -> Self;
 	fn sup(self, s: Self) -> Self;
 	fn extract(self, vs: Vec<Self>) -> Self;
 	fn phase(self, p: Phase) -> Self;
@@ -54,16 +53,6 @@ impl Stateful for State {
 			self.push(real!(0));
 		}
 		self
-	}
-	
-	fn combine(self, s: State) -> State {
-		let mut state = vec![];
-		for x in self {
-			for y in s.iter() {
-				state.push(x * y);
-			}
-		}
-		state
 	}
 	
 	fn sup(self, s: State) -> State {
@@ -101,11 +90,39 @@ impl Stateful for State {
 	}
 }
 
-pub trait Transposable {
+pub trait Combine {
+	fn combine(self, Self) -> Self;
+}
+
+impl Combine for State {
+	fn combine(self, s: State) -> State {
+		let mut state = vec![];
+		for x in self {
+			for y in s.iter() {
+				state.push(x * y);
+			}
+		}
+		state
+	}
+}
+
+impl Combine for Gate {
+	fn combine(self, g: Gate) -> Gate {
+		let mut dims = vec![];
+		for x in self {
+			for y in g.iter() {
+				dims.push(x.clone().combine(y.clone()));
+			}
+		}
+		dims
+	}
+}
+
+pub trait Transpose {
 	fn transpose(self) -> Self;
 }
 
-impl Transposable for Gate {
+impl Transpose for Gate {
 	fn transpose(self) -> Gate {
 		let max_len = self.iter().map(|s| s.len()).max().unwrap_or_else(|| 0);
 		let mut dims: Gate = vec![];
@@ -113,7 +130,7 @@ impl Transposable for Gate {
 			let mut dim: State = vec![];
 			for s in self.iter() {
 				dim.push(match s.get(i) {
-					Some(n) => *n,
+					Some(&n) => n,
 					None => real!(0),
 				});
 			}
