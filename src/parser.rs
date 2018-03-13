@@ -128,8 +128,8 @@ named!(phase<::engine::Phase>, do_parse!(
 	size: alt!(
 		value!(100_f32, ws!(tag!("%"))) |
 		value!(180_f32, ws!(tag!("d"))) |
-		value!(1_f32, ws!(tag!("r"))) |
-		value!(::std::f32::consts::PI)
+		value!(::std::f32::consts::PI, ws!(tag!("r"))) |
+		value!(1_f32)
 	) >>
 	(num as f32 * ::std::f32::consts::PI / size)
 ));

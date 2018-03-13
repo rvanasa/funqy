@@ -23,11 +23,21 @@ fn test_parser() {
 		RunVal::Index(build_state(eval_exp(exp, ctx)).measure())
 	}
 	
+	fn lib_gate(exp: &Exp, ctx: &Context) -> RunVal {
+		RunVal::Tuple(eval_gate(eval_exp(exp, ctx), ctx).into_iter().map(RunVal::State).collect())
+	}
+	
+	fn lib_transpose(exp: &Exp, ctx: &Context) -> RunVal {
+		RunVal::Gate(eval_gate(eval_exp(exp, ctx), ctx).transpose())
+	}
+	
 	let exp = parse_file("tests/scripts/Test.fqy").expect("Could not parse file");
 	let mut ctx = Context::new();
 	ctx.add_macro("sup", &lib_sup);
 	ctx.add_macro("phf", &lib_phf);
 	ctx.add_macro("measure", &lib_measure);
+	ctx.add_macro("gate", &lib_gate);
+	ctx.add_macro("transpose", &lib_transpose);
 	
 	println!("{:?}", exp);
 	println!("\n>> {}\n", eval_exp(&exp, &ctx));

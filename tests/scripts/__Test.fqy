@@ -1,0 +1,8 @@
+data Bool = F | T
+
+fn test = {
+	F => sup(F, T),
+	T => F,
+}
+
+transpose(test)(T)

@@ -12,7 +12,7 @@ pub struct Macro(pub Ident, pub Rc<Fn(&Exp, &Context) -> RunVal>);
 
 impl fmt::Debug for Macro {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "#{}", self.0)
+		write!(f, ":macro: {}", self.0)
 	}
 }
 
@@ -31,9 +31,10 @@ pub enum RunVal {
 	Index(usize),
 	Data(DataType, usize), // TODO replace cloning with reference
 	Tuple(Vec<RunVal>),
-	State(State),
 	Func(Rc<Context>, Pat, Exp),
 	Macro(Macro),
+	State(State),
+	Gate(Gate),
 	Error(Error),
 }
 
@@ -46,6 +47,7 @@ impl fmt::Display for RunVal {
 			&RunVal::Func(ref pat, ref _ctx, ref body) => write!(f, "(..) -> {:?}", body),
 			&RunVal::Macro(ref mc) => write!(f, "{:?}", mc),
 			&RunVal::State(ref state) => write!(f, "{}", StateView(state)),
+			&RunVal::Gate(ref gate) => write!(f, "[{}]", gate.iter().map(|state| format!("{}", StateView(state))).collect::<Vec<String>>().join(", ")),
 			&RunVal::Error(ref err) => write!(f, "<<{}>>", err),
 		}
 	}
@@ -117,7 +119,7 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 			.map(|arg| eval_exp(arg, ctx))
 			.collect()),
 		&Exp::Lambda(ref pat, ref body) => {
-			let mut fn_ctx = ctx.create_child(); // TODO optimize?
+			let fn_ctx = ctx.create_child(); // TODO optimize?
 			RunVal::Func(Rc::new(fn_ctx), pat.clone(), (**body).clone())
 		},
 		&Exp::Invoke(ref target, ref arg) => {
@@ -128,6 +130,7 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 					eval_exp(&body, &fn_ctx)
 				},
 				RunVal::Macro(Macro(_, handle)) => handle(arg, ctx),
+				RunVal::Gate(gate) => RunVal::State(build_state(eval_exp(arg, ctx)).extract(gate)),
 				val => RunVal::Error(format!("Cannot invoke {}", val)),
 			}
 		},
@@ -135,29 +138,8 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 		&Exp::Phase(ref phase, ref arg) => RunVal::State(build_state(eval_exp(arg, ctx)).phase(*phase)),
 		&Exp::Extract(ref arg, ref cases) => {
 			let state = build_state(eval_exp(arg, ctx));
-			let def: State = match cases.get(cases.len() - 1) {
-				Some(&Case::Default(ref result)) => build_state(eval_exp(result, ctx)),
-				_ => vec![],
-			};
-			let mut dims: Vec<State> = vec![];
-			for (i, case) in cases.iter().rev().enumerate() {
-				match case {
-					&Case::Exp(ref selector, ref result) => {
-						let selector_state = build_state(eval_exp(selector, ctx));
-						let result_state = build_state(eval_exp(result, ctx));
-						while dims.len() < selector_state.len() {
-							dims.push(def.clone());
-						}
-						for (i, s) in selector_state.iter().enumerate() {
-							if !::num::Zero::is_zero(s) {
-								dims[i] = result_state.clone();
-							}
-						}
-					},
-					&Case::Default(_) => {},
-				}
-			}
-			RunVal::State(state.extract(dims))
+			let gate = extract_gate(cases, ctx);
+			RunVal::State(state.extract(gate))
 		},
 	}
 }
@@ -200,26 +182,6 @@ pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Result<(), Erro
 	}
 }
 
-// pub fn resolve_index(val: &Pat) -> Option<(usize, usize)> {
-// 	match val {
-// 		&RunVal::Data(ref dt, ref index) => Some((dt.variants.len(), *index)),
-// 		&RunVal::Tuple(ref vals) => {
-// 			let mut acc = (1, 0);
-// 			for val in vals {
-// 				match resolve_index(val) {
-// 					Some((s2, i2)) => {
-// 						let (s1, i1) = acc;
-// 						acc = (s1 * i1, s2 * i1 + i2);
-// 					},
-// 					None => return None,
-// 				}
-// 			}
-// 			Some(acc)
-// 		},
-// 		_ => None,
-// 	}
-// }
-
 pub fn build_state(val: RunVal) -> State {
 	match val {
 		RunVal::Index(n) => get_state(n),
@@ -228,6 +190,52 @@ pub fn build_state(val: RunVal) -> State {
 		RunVal::Func(_ctx, _pat, _body) => unimplemented!(),
 		RunVal::Macro(_mc) => unimplemented!(),
 		RunVal::State(state) => state,
+		RunVal::Gate(state) => unimplemented!(),
 		RunVal::Error(err) => panic!(err),
 	}
+}
+
+pub fn eval_gate_body(exp: &Exp, ctx: &Context) -> Gate {
+	match exp {
+		&Exp::Extract(ref _arg, ref cases) => {
+			extract_gate(cases, ctx)
+		},
+		// _ => eval_val_gate(eval_exp(exp, ctx), ctx)
+		_ => unimplemented!(),
+	}
+}
+
+pub fn eval_gate(val: RunVal, ctx: &Context) -> Gate {
+	match val {
+		RunVal::Tuple(vals) => unimplemented!(),
+		RunVal::Func(_ctx, _pat, body) => eval_gate_body(&body, ctx),
+		RunVal::Gate(gate) => gate,
+		_ => panic!(format!("Not a gate: {}", val)),
+	}
+}
+
+pub fn extract_gate(cases: &Vec<Case>, ctx: &Context) -> Gate {
+	let def: State = match cases.get(cases.len() - 1) {
+		Some(&Case::Default(ref result)) => build_state(eval_exp(result, ctx)),
+		_ => vec![],
+	};
+	let mut dims: Gate = vec![];
+	for (i, case) in cases.iter().rev().enumerate() {
+		match case {
+			&Case::Exp(ref selector, ref result) => {
+				let selector_state = build_state(eval_exp(selector, ctx));
+				let result_state = build_state(eval_exp(result, ctx));
+				while dims.len() < selector_state.len() {
+					dims.push(def.clone());
+				}
+				for (i, s) in selector_state.iter().enumerate() {
+					if !::num::Zero::is_zero(s) {
+						dims[i] = result_state.clone();
+					}
+				}
+			},
+			&Case::Default(_) => {},
+		}
+	}
+	dims
 }

@@ -14,11 +14,11 @@ fn (<<)(a, b) = a(b)
 fn (@)(s) = sup(s)
 let (#) = measure
 
-fn rx = {
+fn px = {
 	F => T,
 	T => F,
 }
-let (!) = rx
+let (!) = px
 
 assert @T : equal(T, T)
 assert @T : !equal(F, T)
@@ -34,7 +34,7 @@ fn id = {
 	T => T,
 }
 
-fn rz = {
+fn pz = {
 	F => F,
 	T => ~T,
 }
@@ -58,12 +58,7 @@ fn bell = {
 	(T, F) => (F, F) ^ ~(T, T),
 	(T, T) => (F, T) ^ ~(T, F),
 }
-fn ibell = {
-	(F, F) => (F, F) ^ (T, F),
-	(F, T) => (F, T) ^ (T, T),
-	(T, F) => (F, T) ^ ~(T, T),
-	(T, T) => (F, F) ^ ~(T, F),
-}
+let ibell = transpose(bell)
 
 assert @F : had(had(F))
 
@@ -77,9 +72,9 @@ let (<>) = kron
 
 fn encode(s, n) = extract n {
 	0 => s,
-	1 => s >> (id <> rx),
-	2 => s >> (id <> rz),
-	3 => s >> (id <> |a| rx(rz(a))),
+	1 => s >> (id <> px),
+	2 => s >> (id <> pz),
+	3 => s >> (id <> |a| px(pz(a))),
 }
 
 fn decode(s) = measure(ibell(s))
@@ -91,17 +86,17 @@ print ibell(shared)
 
 assert data : decode(shared)
 
-fn ry = {
+fn py = {
 	F => [50%] T,
 	T => [150%] F,
 }
 
 fn rotate(r)(s) = extract r {
-	X => rx(s),
-	Y => ry(s),
-	Z => rz(s),
+	X => px(s),
+	Y => py(s),
+	Z => pz(s),
 }
 
-print rotate(X ^ Z)(F)
+assert had(F) : rotate(X ^ Z)(F)
 
-; rotate(X ^ ~Y)(T)
+ibell(bell(F))

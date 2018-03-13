@@ -16,6 +16,7 @@ macro_rules! imag {
 }
 
 pub type State = Vec<Cf32>;
+pub type Gate = Vec<State>;
 pub type Phase = f32;
 
 pub trait DebugPrint {
@@ -25,6 +26,14 @@ pub trait DebugPrint {
 impl DebugPrint for State {
 	fn print(&self) {
 		println!("{}", StateView(self));
+	}
+}
+
+impl DebugPrint for Gate {
+	fn print(&self) {
+		println!("[");
+		self.iter().for_each(|s| s.print());
+		println!("]");
 	}
 }
 
@@ -58,11 +67,10 @@ impl Stateful for State {
 	}
 	
 	fn sup(self, s: State) -> State {
-		// zip(self, s, |x, y| (x + y) / real!(2).sqrt())
 		create_sup(vec![self, s])
 	}
 	
-	fn extract(self, vs: Vec<State>) -> State {
+	fn extract(self, vs: Gate) -> State {
 		create_sup(self.into_iter().zip(vs).map(|(x, s)| {
 			s.iter().map(|y| x * y).collect()
 		}).collect())
@@ -90,7 +98,28 @@ impl Stateful for State {
 		let mut wc = WeightedChoice::new(&mut weights);
 		let mut rng = thread_rng();
 		wc.sample(&mut rng)
-		// TODO persist measured value (fixed by universal no-cloning)
+	}
+}
+
+pub trait Transposable {
+	fn transpose(self) -> Self;
+}
+
+impl Transposable for Gate {
+	fn transpose(self) -> Gate {
+		let max_len = self.iter().map(|s| s.len()).max().unwrap_or_else(|| 0);
+		let mut dims: Gate = vec![];
+		for i in 0..max_len {
+			let mut dim: State = vec![];
+			for s in self.iter() {
+				dim.push(match s.get(i) {
+					Some(n) => *n,
+					None => real!(0),
+				});
+			}
+			dims.push(dim);
+		}
+		dims
 	}
 }
 
