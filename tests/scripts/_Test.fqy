@@ -74,7 +74,7 @@ fn encode(s, n) = extract n {
 	0 => s,
 	1 => s >> (id <> px),
 	2 => s >> (id <> pz),
-	3 => s >> (id <> \a -> px(pz(a))),
+	3 => s >> (id <> |a| px(pz(a))),
 }
 
 fn decode(s) = measure(ibell(s))

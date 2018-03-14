@@ -23,7 +23,7 @@ named!(name_ident<String>, ws!(map!(
 )));
 
 named!(opr_ident<String>, ws!(map!(
-	map_res!(take_while1!(|c| "~!@#%^&*/?-+<>".contains(c as char)), ::std::str::from_utf8),
+	map_res!(take_while1!(|c| "~!@#%^&*/?|-+<>".contains(c as char)), ::std::str::from_utf8),
 	|s| s.to_string()
 )));
 
@@ -87,7 +87,7 @@ named!(default_case<Vec<Case>>, do_parse!(
 ));
 
 named!(exp_case<Vec<Case>>, do_parse!(
-	selectors: separated_list!(ws!(tag!("|")), exp) >>
+	selectors: separated_list!(ws!(tag!("|")), target_exp /**/) >>
 	result: case_result >>
 	(selectors.into_iter().map(|selector| Case::Exp(selector, result.clone())).collect())
 ));
@@ -105,9 +105,9 @@ named!(case<Vec<Case>>,
 
 named!(lambda_exp<Exp>, do_parse!(
 	pat: delimited!(
-		ws!(tag!("|")),
+		ws!(tag!("\\")),
 		pat,
-		ws!(tag!("|"))
+		ws!(tag!("->"))
 	) >>
 	exp: exp >>
 	(Exp::Lambda(pat, Rc::new(exp)))

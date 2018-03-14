@@ -1,4 +1,5 @@
 ### A few ideas for language syntax/semantics ###
+### Note that the actual implementation differs from this example ###
 
 ### Key feature -- `extract` -- can account for simultaneous execution branches simultaneously ###
 

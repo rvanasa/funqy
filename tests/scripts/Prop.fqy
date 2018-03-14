@@ -1,0 +1,39 @@
+data Bool = F | T
+
+fn not = {
+	F => T,
+	T => F,
+}
+let (!) = not
+
+fn conj = {
+	(T, T) => T,
+	_ => F,
+}
+let (&) = conj
+
+fn disj = {
+	(F, F) => F,
+	_ => T,
+}
+let (|) = disj
+
+fn cond = {
+	(T, F) => F,
+	_ => T,
+}
+let (->) = cond
+
+fn xor = {
+	(F, F) | (T, T) => F,
+	(F, T) | (T, F) => T,
+}
+let (^) = xor
+
+fn eq = {
+	(F, T) | (T, F) => F,
+	(F, F) | (T, T) => T,
+}
+
+let (*>) = transpose((->));
+*> T

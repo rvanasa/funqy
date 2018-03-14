@@ -25,7 +25,6 @@ impl PartialEq for Macro {
 	}
 }
 
-type RunValRc = Rc<RunVal>;
 #[derive(Clone,Debug,PartialEq)]
 pub enum RunVal {
 	Index(usize),
@@ -195,7 +194,7 @@ pub fn build_state(val: RunVal) -> State {
 		RunVal::Func(_ctx, _pat, _body) => unimplemented!(),
 		RunVal::Macro(_mc) => unimplemented!(),
 		RunVal::State(state) => state,
-		RunVal::Gate(state) => unimplemented!(),
+		RunVal::Gate(_state) => unimplemented!(),
 		RunVal::Error(err) => panic!(err),
 	}
 }
@@ -212,7 +211,7 @@ pub fn eval_gate_body(exp: &Exp, ctx: &Context) -> Gate {
 
 pub fn eval_gate(val: RunVal, ctx: &Context) -> Gate {
 	match val {
-		RunVal::Tuple(vals) => unimplemented!(),
+		RunVal::Tuple(_vals) => unimplemented!(),
 		RunVal::Func(fn_ctx, _pat, body) => {
 			eval_gate_body(&body, &fn_ctx)
 		},
@@ -227,7 +226,7 @@ pub fn extract_gate(cases: &Vec<Case>, ctx: &Context) -> Gate {
 		_ => vec![],
 	};
 	let mut dims: Gate = vec![];
-	for (i, case) in cases.iter().rev().enumerate() {
+	for case in cases.iter().rev() {
 		match case {
 			&Case::Exp(ref selector, ref result) => {
 				let selector_state = build_state(eval_exp(selector, ctx));

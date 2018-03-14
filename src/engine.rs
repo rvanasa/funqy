@@ -156,11 +156,8 @@ pub fn create_sup(states: Vec<State>) -> State {
 
 // Create a unit vector state in the given Hilbert dimension
 pub fn get_state(n: usize) -> State {
-	if n < 0 /* || n >= max_state_size */ {
-		panic!("Invalid state size: {}", n);
-	}
 	let mut state = vec![];
-	for i in 0..n {
+	for _ in 0..n {
 		state.push(real!(0));
 	}
 	state.push(real!(1));

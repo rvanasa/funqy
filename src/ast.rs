@@ -3,7 +3,6 @@ use std::rc::Rc;
 pub type Ident = String;
 
 // Pattern (e.g. function parameters, match/extract cases)
-type PatRc = Rc<Pat>;
 #[derive(Clone,Debug,PartialEq)]
 pub enum Pat {
 	Wildcard,
@@ -13,7 +12,6 @@ pub enum Pat {
 }
 
 // Scope declaration (statement)
-type DeclRc = Rc<Decl>;
 #[derive(Clone,Debug,PartialEq)]
 pub enum Decl {
 	Data(Ident, Vec<Ident>),
