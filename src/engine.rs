@@ -44,6 +44,7 @@ where Self: ::std::marker::Sized {
 	fn extract(self, vs: Vec<Self>) -> Self;
 	fn phase(self, p: Phase) -> Self;
 	fn phase_flip(self) -> Self;
+	fn prob_sum(&self) -> f32;
 	fn measure(self) -> usize;
 }
 
@@ -74,6 +75,10 @@ impl Stateful for State {
 	
 	fn phase_flip(self) -> State {
 		self.into_iter().map(|x| -x).collect()
+	}
+	
+	fn prob_sum(&self) -> f32 {
+		self.iter().fold(0_f32, |a, b| a + absq(*b))
 	}
 	
 	fn measure(self) -> usize {
@@ -118,19 +123,22 @@ impl Combine for Gate {
 	}
 }
 
-pub trait Transpose {
-	fn transpose(self) -> Self;
+pub trait Matrix {
+	fn width(&self) -> usize;
+	
+	fn inverse(self) -> Self;
 }
 
-impl Transpose for Gate {
-	fn transpose(self) -> Gate {
-		let max_len = self.iter().map(|s| s.len()).max().unwrap_or_else(|| 0);
+impl Matrix for Gate {
+	fn width(&self) -> usize {self.iter().map(|s| s.len()).max().unwrap_or_else(|| 0)}
+	
+	fn inverse(self) -> Gate {
 		let mut dims: Gate = vec![];
-		for i in 0..max_len {
+		for i in 0..self.width() {
 			let mut dim: State = vec![];
 			for s in self.iter() {
 				dim.push(match s.get(i) {
-					Some(&n) => n,
+					Some(&n) => n.conj(),
 					None => real!(0),
 				});
 			}

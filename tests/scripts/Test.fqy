@@ -58,7 +58,7 @@ fn bell = {
 	(T, F) => (F, F) ^ ~(T, T),
 	(T, T) => (F, T) ^ ~(T, F),
 }
-let ibell = transpose(bell)
+let ibell = inv(bell)
 
 assert @F : had(had(F))
 

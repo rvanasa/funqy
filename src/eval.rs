@@ -221,26 +221,30 @@ pub fn eval_gate(val: RunVal, ctx: &Context) -> Gate {
 }
 
 pub fn extract_gate(cases: &Vec<Case>, ctx: &Context) -> Gate {
-	let def: State = match cases.get(cases.len() - 1) {
-		Some(&Case::Default(ref result)) => build_state(eval_exp(result, ctx)),
-		_ => vec![],
-	};
 	let mut dims: Gate = vec![];
-	for case in cases.iter().rev() {
+	for case in cases.iter() {
 		match case {
 			&Case::Exp(ref selector, ref result) => {
 				let selector_state = build_state(eval_exp(selector, ctx));
 				let result_state = build_state(eval_exp(result, ctx));
 				while dims.len() < selector_state.len() {
-					dims.push(def.clone());
+					dims.push(vec![]);
 				}
 				for (i, s) in selector_state.iter().enumerate() {
-					if !::num::Zero::is_zero(s) {
-						dims[i] = result_state.clone();
+					let len = ::std::cmp::max(result_state.len(), dims[i].len());
+					// TODO improve impl
+					dims[i] = result_state.clone().pad(len).into_iter().zip(dims[i].clone().pad(len).into_iter()).map(|(r, d)| r * s + d).collect();
+				}
+			},
+			&Case::Default(ref result) => {
+				let state = build_state(eval_exp(result, ctx));
+				for i in 0..dims.len() {
+					use num::Zero;
+					if dims[i].prob_sum().is_zero() {
+						dims[i] = state.clone();
 					}
 				}
 			},
-			&Case::Default(_) => {},
 		}
 	}
 	//??

@@ -26,8 +26,8 @@ fn test_parser() {
 		RunVal::Tuple(eval_gate(eval_exp(exp, ctx), ctx).into_iter().map(RunVal::State).collect())
 	}
 	
-	fn lib_transpose(exp: &Exp, ctx: &Context) -> RunVal {
-		RunVal::Gate(eval_gate(eval_exp(exp, ctx), ctx).transpose())
+	fn lib_inv(exp: &Exp, ctx: &Context) -> RunVal {
+		RunVal::Gate(eval_gate(eval_exp(exp, ctx), ctx).inverse())
 	}
 	
 	let exp = parse_file("tests/scripts/Test.fqy").expect("Could not parse file");
@@ -36,7 +36,7 @@ fn test_parser() {
 	ctx.add_macro("phf", &lib_phf);
 	ctx.add_macro("measure", &lib_measure);
 	ctx.add_macro("gate", &lib_gate);
-	ctx.add_macro("transpose", &lib_transpose);
+	ctx.add_macro("inv", &lib_inv);
 	
 	println!("{:?}", exp);
 	println!("\n>> {}\n", eval_exp(&exp, &ctx));

@@ -1,109 +1,16 @@
 data Bool = F | T
-data Dir3 = X | Y | Z
 
-let (abc, qwe) = ((F, T), T)
+fn f = {
+	F => sup(F, T),
+	T => sup(F, phf(T)),
+	_ => 0,
+}
 
 fn equal = {
 	(F, F) | (T, T) => T,
 	_ => F,
 }
 
-fn (>>)(a, b) = b(a)
-fn (<<)(a, b) = a(b)
+print gate(equal)
 
-fn (@)(s) = sup(s)
-let (#) = measure
-
-fn px = {
-	F => T,
-	T => F,
-}
-let (!) = px
-
-assert @T : equal(T, T)
-assert @T : !equal(F, T)
-
-let (^) = sup
-let (~) = phf
-
-assert F ^ T : T ^ F
-assert F ^ T : @(F ^ T)
-
-fn id = {
-	F => F,
-	T => T,
-}
-
-fn pz = {
-	F => F,
-	T => ~T,
-}
-
-fn had = {
-	F => F ^ T,
-	T => F ^ ~T,
-}
-
-fn cnot(a, b) = extract a {
-	F => (F, b),
-	T => (T, !b),
-}
-let (*!) = cnot
-
-fn bellgate(a, b) = had(a) *! b
-
-fn bell = {
-	(F, F) => (F, F) ^ (T, T),
-	(F, T) => (F, T) ^ (T, F),
-	(T, F) => (F, F) ^ ~(T, T),
-	(T, T) => (F, T) ^ ~(T, F),
-}
-let ibell = transpose(bell)
-
-assert @F : had(had(F))
-
-fn kron(a, b)(s) = extract s {
-	(F, F) => (a(F), b(F)),
-	(F, T) => (a(F), b(T)),
-	(T, F) => (a(T), b(F)),
-	(T, T) => (a(T), b(T)),
-}
-let (<>) = kron
-
-fn encode(s, n) = extract n {
-	0 => s,
-	1 => s >> (id <> px),
-	2 => s >> (id <> pz),
-	3 => s >> (id <> |a| px(pz(a))),
-}
-
-fn decode(s) = measure(ibell(s))
-
-let data = 2
-let shared = encode(bell(F, F), data)
-
-print ibell(shared)
-
-assert data : decode(shared)
-
-fn py = {
-	F => [50%] T,
-	T => [150%] F,
-}
-
-fn rotate(r)(s) = extract r {
-	X => px(s),
-	Y => py(s),
-	Z => pz(s),
-}
-
-assert had(F) : rotate(X ^ Z)(F)
-
-fn cnot = {
-	(F, F) => (F, F),
-	(F, T) => (F, T),
-	(T, F) => (T, T),
-	(T, T) => (T, F),
-}
-
-; (F, F) >> (had, id) >> cnot
+equal(T,F)
