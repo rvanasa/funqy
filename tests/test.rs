@@ -23,11 +23,11 @@ fn test_parser() {
 	}
 	
 	fn lib_gate(exp: &Exp, ctx: &Context) -> RunVal {
-		RunVal::Tuple(eval_gate(eval_exp(exp, ctx), ctx).into_iter().map(RunVal::State).collect())
+		RunVal::Tuple(build_gate(&eval_exp(exp, ctx), ctx).unwrap().into_iter().map(RunVal::State).collect())
 	}
 	
 	fn lib_inv(exp: &Exp, ctx: &Context) -> RunVal {
-		RunVal::Gate(eval_gate(eval_exp(exp, ctx), ctx).inverse())
+		RunVal::Gate(build_gate(&eval_exp(exp, ctx), ctx).unwrap().inverse())
 	}
 	
 	let exp = parse_file("tests/scripts/Test.fqy").expect("Could not parse file");

@@ -17,7 +17,7 @@ macro_rules! imag {
 
 pub type State = Vec<Cf32>;
 pub type Gate = Vec<State>;
-pub type Phase = f32;
+pub type Phase = Cf32;
 
 pub trait DebugPrint {
 	fn print(&self);
@@ -67,10 +67,12 @@ impl Stateful for State {
 	}
 	
 	fn phase(self, p: Phase) -> State {
-		let (cos, sin) = (p.cos(), p.sin());
-		self.into_iter().map(|x| Complex::new(
-			cos * x.re + sin * x.im,
-			sin * x.re + cos * x.im)).collect()
+		let n = p * ::std::f32::consts::PI;
+		let (cos, sin) = (n.cos(), n.sin());
+		self.into_iter().map(|x| Complex::new(//TODO implement imaginary phases
+			cos.re * x.re + sin.re * x.im,
+			sin.re * x.re + cos.re * x.im,
+		)).collect()
 	}
 	
 	fn phase_flip(self) -> State {
@@ -78,7 +80,7 @@ impl Stateful for State {
 	}
 	
 	fn prob_sum(&self) -> f32 {
-		self.iter().fold(0_f32, |a, b| a + absq(*b))
+		self.iter().fold(0_f32, |a, &b| a + absq(b))
 	}
 	
 	fn measure(self) -> usize {
@@ -123,14 +125,28 @@ impl Combine for Gate {
 	}
 }
 
-pub trait Matrix {
+pub trait MatrixLike {
 	fn width(&self) -> usize;
 	
+	fn is_unitary(&self) -> bool;
+	
 	fn inverse(self) -> Self;
+	fn power(self, Phase) -> Self;
 }
 
-impl Matrix for Gate {
+impl MatrixLike for Gate {
 	fn width(&self) -> usize {self.iter().map(|s| s.len()).max().unwrap_or_else(|| 0)}
+	
+	fn is_unitary(&self) -> bool {
+		for (i, s) in self.iter().enumerate() {
+			for (j, n) in s[(i + 1)..].iter().enumerate() {
+				if self[i][j] != n.conj() {
+					return false
+				}
+			}
+		}
+		true
+	}
 	
 	fn inverse(self) -> Gate {
 		let mut dims: Gate = vec![];
@@ -146,11 +162,34 @@ impl Matrix for Gate {
 		}
 		dims
 	}
+	
+	fn power(self, p: Phase) -> Self {
+		use ndarray::{Array, Ix2};
+		use ndarray_linalg::*;
+		use num::One;
+		if p.is_one() {
+			return self
+		}
+		let size = ::std::cmp::max(self.len(), self.width());
+		let mut arr = Array::<Cf32, Ix2>::zeros((size, size));
+		for (i, s) in self.into_iter().enumerate() {
+			for (j, n) in s.into_iter().enumerate() {
+				arr[(i, j)] = n;
+			}
+		}
+		let (vals, vecs) = arr.eigh(UPLO::Upper).unwrap();
+		let mut diag = Array::<Cf32, Ix2>::zeros((size, size));
+		for (i, &d) in vals.iter().enumerate() {
+			diag[(i, i)] = real!(d).powc(p);
+		}
+		let out = arr.dot(&vecs.inv().unwrap()).dot(&diag).dot(&vecs);
+		(0..out.rows()).map(|i| out.row(i).to_vec()).collect()
+	}
 }
 
 // Create a superposition of the given states
 pub fn create_sup(states: Vec<State>) -> State {
-	let div = states.iter().map(|v| v.iter().fold(0_f32, |a, b| a + absq(*b)))
+	let div = states.iter().map(|v| v.prob_sum())
 		.fold(0_f32, |a, b| a + b).sqrt();
 	
 	states.into_iter().fold(vec![], |a, b| zip(a, b, |x, y| x + y))
@@ -206,7 +245,6 @@ impl<'a> fmt::Display for StateView<'a> {
 }
 
 fn round(f: Cf32, d: i32) -> Cf32 {
-	use num::complex::Complex;
 	let m = Complex::new(10_f32.powi(d), 0_f32);
 	let f = f * m;
 	Complex::new(f.re.round(), f.im.round()) / m

@@ -123,11 +123,7 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 		},
 		&Exp::Invoke(ref target, ref arg) => {
 			match eval_exp(target, ctx) {
-				RunVal::Tuple(fns) => {
-					let state = build_state(eval_exp(arg, ctx));
-					let gate = fns.into_iter().map(|f| eval_gate(f, ctx)).fold(vec![get_state(0)], |a, b| a.combine(b));
-					RunVal::State(state.extract(gate))
-				},
+				// TODO proper tuple function evaluation
 				RunVal::Func(fn_ctx_rc, pat, body) => {
 					let mut fn_ctx = (*fn_ctx_rc).clone();
 					assign_pat(&pat, &eval_exp(arg, ctx), &mut fn_ctx).unwrap();
@@ -135,14 +131,24 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 				},
 				RunVal::Macro(Macro(_, handle)) => handle(arg, ctx),
 				RunVal::Gate(gate) => RunVal::State(build_state(eval_exp(arg, ctx)).extract(gate)),
-				val => RunVal::Error(format!("Cannot invoke {}", val)),
+				val => {
+					let msg = &format!("Cannot invoke {}", val)[..];
+					let state = build_state(eval_exp(arg, ctx));
+					let gate = build_gate(&val, ctx).expect(msg);
+					RunVal::State(state.extract(gate))
+				},
 			}
 		},
 		&Exp::State(ref arg) => RunVal::State(build_state(eval_exp(arg, ctx))),
-		&Exp::Phase(phase, ref arg) => RunVal::State(build_state(eval_exp(arg, ctx)).phase(phase)),
+		&Exp::Phase(phase, ref arg) => {
+			let val = eval_exp(arg, ctx);
+			build_gate(&val, ctx)
+				.map(|g| RunVal::Gate(g.power(phase)))
+				.unwrap_or_else(|| RunVal::State(build_state(val).phase(phase)))
+		},
 		&Exp::Extract(ref arg, ref cases) => {
 			let state = build_state(eval_exp(arg, ctx));
-			let gate = extract_gate(cases, ctx);
+			let gate = create_extract_gate(cases, ctx);
 			RunVal::State(state.extract(gate))
 		},
 	}
@@ -199,28 +205,25 @@ pub fn build_state(val: RunVal) -> State {
 	}
 }
 
-pub fn eval_gate_body(exp: &Exp, ctx: &Context) -> Gate {
+pub fn eval_gate_body(exp: &Exp, ctx: &Context) -> Option<Gate> {
 	match exp {
-		&Exp::Extract(ref _arg, ref cases) => {
-			extract_gate(cases, ctx)
-		},
-		// _ => eval_val_gate(eval_exp(exp, ctx), ctx)
-		_ => unimplemented!(),
+		&Exp::Extract(ref _arg, ref cases) => Some(create_extract_gate(cases, ctx)),
+		_ => None,
 	}
 }
 
-pub fn eval_gate(val: RunVal, ctx: &Context) -> Gate {
+pub fn build_gate(val: &RunVal, ctx: &Context) -> Option<Gate> {
 	match val {
-		RunVal::Tuple(_vals) => unimplemented!(),
-		RunVal::Func(fn_ctx, _pat, body) => {
-			eval_gate_body(&body, &fn_ctx)
-		},
-		RunVal::Gate(gate) => gate,
-		_ => panic!(format!("Not a gate: {}", val)),
+		&RunVal::Tuple(ref vals) => vals.iter()
+			.fold(Some(vec![get_state(0)]), 
+				|a, b| a.and_then(|a| build_gate(b, ctx).map(|b| a.combine(b)))),
+		&RunVal::Func(ref fn_ctx, ref _pat, ref body) => eval_gate_body(body, fn_ctx),
+		&RunVal::Gate(ref gate) => Some(gate.clone()),
+		_ => None,
 	}
 }
 
-pub fn extract_gate(cases: &Vec<Case>, ctx: &Context) -> Gate {
+pub fn create_extract_gate(cases: &Vec<Case>, ctx: &Context) -> Gate {
 	let mut dims: Gate = vec![];
 	for case in cases.iter() {
 		match case {
@@ -247,7 +250,10 @@ pub fn extract_gate(cases: &Vec<Case>, ctx: &Context) -> Gate {
 			},
 		}
 	}
-	//??
-	let max_len = dims.iter().map(|s| s.len()).max().unwrap_or_else(|| 0);
-	dims.into_iter().map(|s| s.pad(max_len)).collect()
+	let max_len = dims.iter().map(|s| s.len()).max().unwrap_or(0);
+	let gate: Gate = dims.into_iter().map(|s| s.pad(max_len)).collect();
+	// if !gate.is_unitary() {
+	// 	panic!("Non-unitary extraction: {:?}", cases);
+	// }
+	gate
 }

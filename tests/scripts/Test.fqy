@@ -62,7 +62,7 @@ let ibell = inv(bell)
 
 assert @F : had(had(F))
 
-fn kron(a, b)(s) = extract s {
+fn kron(a, b) = extract {
 	(F, F) => (a(F), b(F)),
 	(F, T) => (a(F), b(T)),
 	(T, F) => (a(T), b(F)),
@@ -87,8 +87,8 @@ print ibell(shared)
 assert data : decode(shared)
 
 fn py = {
-	F => [50%] T,
-	T => [150%] F,
+	F => [1/2] T,
+	T => [3/2] F,
 }
 
 fn rotate(r)(s) = extract r {
@@ -106,4 +106,11 @@ fn cnot = {
 	(T, T) => (T, F),
 }
 
-; (F, F) >> (had, id) >> cnot
+fn sqrt(f) = [1/2] f
+
+print [1/3] extract {
+	F => F ^ T,
+	T => F ^ ~T,
+}
+
+; ()

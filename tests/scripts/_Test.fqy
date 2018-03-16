@@ -11,6 +11,8 @@ fn equal = {
 	_ => F,
 }
 
-print gate(equal)
-
-equal(T,F)
+[1/3]
+extract {
+	F => T,
+	T => F,
+}

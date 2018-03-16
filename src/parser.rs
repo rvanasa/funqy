@@ -1,4 +1,5 @@
 use ast::*;
+use engine::Phase;
 
 use std::rc::Rc;
 use std::fs::File;
@@ -16,6 +17,12 @@ named!(nat_literal<usize>, ws!(map_res!(
 	map_res!(take_while1!(nom::is_digit), ::std::str::from_utf8),
 	|s: &str| s.parse()
 )));
+
+named!(int_literal<isize>, do_parse!(
+	sig: opt!(value!(-1, tag!("-"))) >>
+	nat: nat_literal >>
+	(nat as isize * sig.unwrap_or(1))
+));
 
 named!(name_ident<String>, ws!(map!(
 	map_res!(take_while1!(nom::is_alphanumeric), ::std::str::from_utf8),
@@ -66,9 +73,16 @@ named!(scope_exp<Exp>, do_parse!(
 
 named!(extract_exp<Exp>, do_parse!(
 	ws!(tag!("extract")) >>
-	exp: exp >>
+	exp: opt!(exp) >>
 	cases: extract_cases >>
-	(Exp::Extract(Rc::new(exp), cases))
+	({
+		match exp {
+			None => Exp::Lambda(
+				Pat::Var("$arg".to_string()),
+				Rc::new(Exp::Extract(Rc::new(Exp::Var("$arg".to_string())), cases))),
+			Some(exp) => Exp::Extract(Rc::new(exp), cases),
+		}
+	})
 ));
 
 named!(extract_cases<Vec<Case>>, map!(
@@ -116,22 +130,23 @@ named!(lambda_exp<Exp>, do_parse!(
 named!(phase_exp<Exp>, do_parse!(
 	phase: delimited!(
 		ws!(tag!("[")),
-		phase,
+		tuple!(phase, opt!(map!(preceded!(ws!(tag!(",")), phase), |p| p * Phase::i()))),
 		ws!(tag!("]"))
 	) >>
 	exp: exp >>
-	(Exp::Phase(phase, Rc::new(exp)))
+	(Exp::Phase(phase.0 + phase.1.unwrap_or(::num::Zero::zero()), Rc::new(exp)))
 ));
 
-named!(phase<::engine::Phase>, do_parse!(
-	num: nat_literal >>
+named!(phase<Phase>, do_parse!(
+	num: int_literal >>
 	size: alt!(
+		preceded!(ws!(tag!("/")), map!(nat_literal, |n| n as f32)) |
 		value!(100_f32, ws!(tag!("%"))) |
 		value!(180_f32, ws!(tag!("d"))) |
 		value!(::std::f32::consts::PI, ws!(tag!("r"))) |
 		value!(1_f32)
 	) >>
-	(num as f32 * ::std::f32::consts::PI / size)
+	(Phase::new(num as f32 / size, 0_f32))
 ));
 
 named!(path_exp<Exp>,
