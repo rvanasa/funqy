@@ -23,7 +23,8 @@ fn test_parser() {
 	}
 	
 	fn lib_gate(exp: &Exp, ctx: &Context) -> RunVal {
-		RunVal::Tuple(build_gate(&eval_exp(exp, ctx), ctx).unwrap().into_iter().map(RunVal::State).collect())
+		let val = eval_exp(exp, ctx);
+		RunVal::Tuple(build_gate(&val, ctx).unwrap_or_else(|| panic!("Not a gate: {}", val)).into_iter().map(RunVal::State).collect())
 	}
 	
 	fn lib_inv(exp: &Exp, ctx: &Context) -> RunVal {

@@ -237,6 +237,14 @@ named!(print_decl<Decl>, do_parse!(
 	(Decl::Print(exp))
 ));
 
+// named!(assign_decl<Decl>, do_parse!(
+// 	id: ident >>
+// 	pat: many0!(tuple_pat) >>
+// 	ws!(tag!("=")) >>
+// 	body: exp >>
+// 	(Decl::Let(Pat::Var(id), pat.into_iter().rev().fold(body, |exp, pat| Exp::Lambda(pat, Rc::new(exp)))))
+// ));
+
 named!(decl<Decl>,
 	alt!(let_decl | data_decl | func_decl | assert_decl | print_decl)
 );

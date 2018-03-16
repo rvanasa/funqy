@@ -108,6 +108,4 @@ fn cnot = {
 
 fn sqrt(f) = [1/2] f
 
-print [1/2] had
-
-; ()
+; gate(X)
