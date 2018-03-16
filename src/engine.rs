@@ -138,14 +138,16 @@ impl MatrixLike for Gate {
 	fn width(&self) -> usize {self.iter().map(|s| s.len()).max().unwrap_or_else(|| 0)}
 	
 	fn is_unitary(&self) -> bool {
-		for (i, s) in self.iter().enumerate() {
-			for (j, n) in s[(i + 1)..].iter().enumerate() {
-				if self[i][j] != n.conj() {
-					return false
-				}
-			}
-		}
-		true
+		unimplemented!()
+		// // Hermitian:
+		// for (i, s) in self.iter().enumerate() {
+		// 	for (j, n) in s[(i + 1)..].iter().enumerate() {
+		// 		if self[i][j] != n.conj() {
+		// 			return false
+		// 		}
+		// 	}
+		// }
+		// true
 	}
 	
 	fn inverse(self) -> Gate {
@@ -182,7 +184,7 @@ impl MatrixLike for Gate {
 		for (i, &d) in vals.iter().enumerate() {
 			diag[(i, i)] = real!(d).powc(p);
 		}
-		let out = arr.dot(&vecs.inv().unwrap()).dot(&diag).dot(&vecs);
+		let out = vecs.inv().unwrap().dot(&diag).dot(&vecs);
 		(0..out.rows()).map(|i| out.row(i).to_vec()).collect()
 	}
 }

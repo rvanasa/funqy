@@ -108,9 +108,6 @@ fn cnot = {
 
 fn sqrt(f) = [1/2] f
 
-print [1/3] extract {
-	F => F ^ T,
-	T => F ^ ~T,
-}
+print [1/2] had
 
 ; ()
