@@ -35,5 +35,5 @@ fn eq = {
 	(F, F) | (T, T) => T,
 }
 
-let (*>) = transpose((->));
+let (*>) = inv((->));
 *> T

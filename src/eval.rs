@@ -250,7 +250,7 @@ pub fn create_extract_gate(cases: &Vec<Case>, ctx: &Context) -> Gate {
 			},
 		}
 	}
-	let max_len = dims.iter().map(|s| s.len()).max().unwrap_or(0);
+	let max_len = dims.iter().map(Vec::len).max().unwrap_or(0);
 	let gate: Gate = dims.into_iter().map(|s| s.pad(max_len)).collect();
 	// if !gate.is_unitary() {
 	// 	panic!("Non-unitary extraction: {:?}", cases);

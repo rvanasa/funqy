@@ -44,6 +44,15 @@ fn had = {
 	T => F ^ ~T,
 }
 
+fn had2 {
+	F => F,
+	F => T,
+	T => F,
+	T => phf(T),
+}
+
+assert (had(F ^ T), had(F ^ ~T)) : (had2(F ^ T), had2(F ^ ~T))
+
 fn cnot(a, b) = extract a {
 	F => (F, b),
 	T => (T, !b),
@@ -106,6 +115,6 @@ fn cnot = {
 	(T, T) => (T, F),
 }
 
-fn sqrt(f) = [1/2] f
+fn sqrt(f) = [1/2] gate(f)
 
-; gate(X)
+; sqrt(px)

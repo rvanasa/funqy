@@ -140,7 +140,7 @@ named!(phase_exp<Exp>, do_parse!(
 named!(phase<Phase>, do_parse!(
 	num: int_literal >>
 	size: alt!(
-		preceded!(ws!(tag!("/")), map!(nat_literal, |n| n as f32)) |
+		preceded!(ws!(tag!("/")), map!(int_literal, |n| n as f32)) |
 		value!(100_f32, ws!(tag!("%"))) |
 		value!(180_f32, ws!(tag!("d"))) |
 		value!(::std::f32::consts::PI, ws!(tag!("r"))) |
@@ -236,14 +236,6 @@ named!(print_decl<Decl>, do_parse!(
 	exp: exp >>
 	(Decl::Print(exp))
 ));
-
-// named!(assign_decl<Decl>, do_parse!(
-// 	id: ident >>
-// 	pat: many0!(tuple_pat) >>
-// 	ws!(tag!("=")) >>
-// 	body: exp >>
-// 	(Decl::Let(Pat::Var(id), pat.into_iter().rev().fold(body, |exp, pat| Exp::Lambda(pat, Rc::new(exp)))))
-// ));
 
 named!(decl<Decl>,
 	alt!(let_decl | data_decl | func_decl | assert_decl | print_decl)
