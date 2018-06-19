@@ -1,17 +1,12 @@
 use ast::*;
 use engine::Phase;
+use error::Error;
 
+use std::fs;
 use std::rc::Rc;
-use std::fs::File;
-use std::io::prelude::*;
+use regex::Regex;
 
 use nom;
-
-pub type Error = String;
-
-// macro_rules! term {
-// 	($id:tt) => {ws!(tag!($id))};
-// }
 
 named!(nat_literal<usize>, ws!(map_res!(
 	map_res!(take_while1!(nom::is_digit), ::std::str::from_utf8),
@@ -24,24 +19,37 @@ named!(int_literal<isize>, do_parse!(
 	(nat as isize * sig.unwrap_or(1))
 ));
 
+named!(string_literal<String>, delimited!(
+	tag!("\""),
+	fold_many0!(
+		alt!(
+			pair!(tag!(r"\"), take!(1)) => {|(_, b)| b} |
+			is_not!("\"")
+		),
+		String::new(),
+		|a, b| format!("{}{}", a, String::from_utf8_lossy(b))
+	),
+	tag!("\"")
+));
+
+named!(literal_exp<Exp>, alt!(
+	nat_literal => {Exp::Nat} |
+	string_literal => {Exp::String}
+));
+
 named!(name_ident<String>, ws!(map!(
 	map_res!(take_while1!(nom::is_alphanumeric), ::std::str::from_utf8),
 	|s| s.to_string()
 )));
 
 named!(opr_ident<String>, ws!(map!(
-	map_res!(take_while1!(|c| "~!@#%^&*/?|-+<>".contains(c as char)), ::std::str::from_utf8),
+	map_res!(take_while1!(|c| "~!@#%^&*/?|-+<>.".contains(c as char)), ::std::str::from_utf8),
 	|s| s.to_string()
 )));
 
 named!(ident<String>,
 	alt!(name_ident | delimited!(ws!(tag!("(")), opr_ident, ws!(tag!(")"))))
 );
-
-named!(literal_exp<Exp>, map!(
-	nat_literal,
-	Exp::Literal
-));
 
 named!(var_exp<Exp>, map!(
 	ident,
@@ -66,9 +74,9 @@ named!(block_exp<Exp>,
 );
 
 named!(scope_exp<Exp>, do_parse!(
-	decls: many0!(terminated!(decl, opt!(ws!(tag!(";"))))) >>
-	exp: exp >>
-	(Exp::Scope(decls, Rc::new(exp)))
+	decls: many0!(terminated!(decl, opt!(complete!(ws!(tag!(";")))))) >>
+	exp: opt!(complete!(exp)) >>
+	(Exp::Scope(decls, Rc::new(exp.unwrap_or_else(|| Exp::Tuple(vec![])))))
 ));
 
 named!(extract_exp<Exp>, do_parse!(
@@ -171,7 +179,7 @@ named!(target_exp<Exp>,
 
 named!(exp<Exp>, do_parse!(
 	exp: target_exp >>
-	infixes: many0!(tuple!(opr_ident, target_exp)) >>
+	infixes: many0!(pair!(opr_ident, target_exp)) >>
 	(infixes.into_iter().fold(exp, |a, (opr, b)| Exp::Invoke(
 		Rc::new(Exp::Var(opr)),
 		Rc::new(Exp::Tuple(vec![a, b])),
@@ -190,14 +198,18 @@ named!(data_decl<Decl>, do_parse!(
 	ws!(tag!("data")) >>
 	id: ident >>
 	ws!(tag!("=")) >>
-	variants: separated_list!(ws!(tag!("|")), data_val) >>
-	(Decl::Data(id, variants))
+	variant: data_val >>
+	variants: many0!(preceded!(ws!(tag!("|")), data_val)) >>
+	(Decl::Data(id, {
+		let mut vs = vec![variant];
+		vs.extend(variants);
+		vs
+	}))
 ));
 
-named!(data_val<Ident>, do_parse!(
-	id: ident >>
-	(id)
-));
+named!(data_val<Ident>,
+	alt!(ident)
+);
 
 named!(func_decl<Decl>, do_parse!(
 	ws!(tag!("fn")) >>
@@ -226,7 +238,7 @@ named!(func_part<Exp>,
 named!(assert_decl<Decl>, do_parse!(
 	ws!(tag!("assert")) >>
 	expect: exp >>
-	ws!(tag!(":")) >>
+	ws!(tag!("==")) >>
 	result: exp >>
 	(Decl::Assert(expect, result))
 ));
@@ -265,23 +277,19 @@ named!(pat<Pat>,
 );
 
 pub fn parse_file(path: &str) -> Result<Exp, Error> {
-	let mut file = File::open(&path).expect("Could not open file"); // convert to Result
-	let mut input = String::new();
-	file.read_to_string(&mut input).expect("Could not read from file");
-	parse(input)
+	parse(String::from_utf8_lossy(&fs::read(path)?).to_string())
 }
 
 pub fn parse(input: String) -> Result<Exp, Error> {
+	let input = input + "\n";
+	let input = Regex::new("//[^\n]*\n").unwrap().replace_all(&input[..], " ");
 	match scope_exp(input.as_bytes()) {
 		nom::IResult::Done(s, exp) => {
 			if s.len() == 0 {Ok(exp)}
-			else {Err(format!("Trailing input: {}", match ::std::str::from_utf8(s) {
-				Ok(s) => s,
-				Err(_) => "<?>",
-			}))}
+			else {Err(Error(format!("Trailing input: {}", String::from_utf8_lossy(s))))}
 		},
-		nom::IResult::Error(err) => Err(format!("Parse error: {}", err.description())),
-		nom::IResult::Incomplete(nom::Needed::Unknown) => Err(format!("Incomplete input")),
-		nom::IResult::Incomplete(nom::Needed::Size(n)) => Err(format!("Incomplete input ({})", n)),
+		nom::IResult::Error(err) => Err(Error(format!("Parse error: {}", err.description()))),
+		nom::IResult::Incomplete(nom::Needed::Unknown) => Err(Error(format!("Incomplete input"))),
+		nom::IResult::Incomplete(nom::Needed::Size(n)) => Err(Error(format!("Incomplete input ({})", n - input.len()))),
 	}
 }

@@ -1,18 +1,130 @@
 data Bool = F | T
+data Dir3 = X | Y | Z
+data Cardinal = Left | Right | Down | Up
 
-fn f = {
-	F => sup(F, T),
-	T => sup(F, phf(T)),
-	_ => 0,
-}
+let (abc, qwe) = ((F, T), T)
 
 fn equal = {
 	(F, F) | (T, T) => T,
 	_ => F,
 }
 
-[1/3]
-extract {
+fn (.)(f, g)(a) = g(f(a))
+
+fn (>>)(a, b) = b(a)
+fn (<<)(a, b) = a(b)
+
+fn (@)(s) = sup(s)
+let (#) = measure
+
+fn px = {
 	F => T,
 	T => F,
 }
+let (!) = px
+
+assert @T == equal(T, T)
+assert @T == !equal(F, T)
+
+let (^) = sup
+let (~) = phf
+
+assert F ^ T == T ^ F
+assert F ^ T == @(F ^ T)
+
+fn id = {
+	F => F,
+	T => T,
+}
+
+fn pz = {
+	F => F,
+	T => ~T,
+}
+
+fn had = {
+	F => F ^ T,
+	T => F ^ ~T,
+}
+
+fn had2 {
+	F => F,
+	F => T,
+	T => F,
+	T => phf(T),
+}
+
+assert (had(F ^ T), had(F ^ ~T)) == (had2(F ^ T), had2(F ^ ~T))
+
+fn cnot(a, b) = extract a {
+	F => (F, b),
+	T => (T, !b),
+}
+let (*!) = cnot
+
+fn bellgate(a, b) = had(a) *! b
+
+fn bell = {
+	(F, F) => (F, F) ^ (T, T),
+	(F, T) => (F, T) ^ (T, F),
+	(T, F) => (F, F) ^ ~(T, T),
+	(T, T) => (F, T) ^ ~(T, F),
+}
+let ibell = inv(bell)
+
+assert @F == had(had(F))
+
+fn kron(a, b) = extract {
+	(F, F) => (a(F), b(F)),
+	(F, T) => (a(F), b(T)),
+	(T, F) => (a(T), b(F)),
+	(T, T) => (a(T), b(T)),
+}
+let (<>) = kron
+
+fn encode(s, n) = extract n {
+	0 => s,
+	1 => s >> (id <> px),
+	2 => s >> (id <> pz),
+	3 => s >> (id <> \a -> px(pz(a))),
+}
+
+fn decode(s) = measure(ibell(s))
+
+let data = 2
+let shared = encode(bell(F, F), data)
+
+print ibell(shared)
+
+assert data == decode(shared)
+
+fn py = {
+	F => [1/2] T,
+	T => [3/2] F,
+}
+
+fn rotate(r)(s) = extract r {
+	X => px(s),
+	Y => py(s),
+	Z => pz(s),
+}
+
+assert had(F) == rotate(X ^ Z)(F)
+
+fn sqrt(f) = [1/2] gate(f)
+
+fn ctrl(c, fg, tg)(q) = extract c {
+	F => fg(q),
+	T => tg(q),
+};
+
+let qft2 = (had, had)
+let qft4 = (qft2, qft2)
+// let qft8 = (qft4, qft4)
+
+// assert ctrl(had(F), px, py)(F) : [1/4] T
+
+let series = ^(0, 5, 10, 15)
+
+print series
+print qft4(data)

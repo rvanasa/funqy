@@ -28,6 +28,7 @@ impl PartialEq for Macro {
 #[derive(Clone,Debug,PartialEq)]
 pub enum RunVal {
 	Index(usize),
+	String(String),
 	Data(DataType, usize), // TODO replace cloning with reference
 	Tuple(Vec<RunVal>),
 	Func(Rc<Context>, Pat, Exp),
@@ -41,6 +42,7 @@ impl fmt::Display for RunVal {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			&RunVal::Index(ref n) => write!(f, "{}", n),
+			&RunVal::String(ref s) => write!(f, "{:?}", s),
 			&RunVal::Data(ref dt, ref index) => write!(f, "{}", dt.variants[*index]),
 			&RunVal::Tuple(ref vals) => write!(f, "({})", vals.iter().map(|val| format!("{}", val)).collect::<Vec<String>>().join(", ")),
 			&RunVal::Func(ref _ctx, ref _pat, ref _body) => write!(f, "(..) -> (..)"),
@@ -59,16 +61,22 @@ pub struct DataType {
 
 #[derive(Clone,Debug,PartialEq)]
 pub struct Context {
+	path: String,
 	vars: HashMap<Ident, RunVal>,
 	datatypes: HashMap<Ident, DataType>,
 }
 
 impl Context {
-	pub fn new() -> Context {
+	pub fn new(path: String) -> Context {
 		Context {
+			path: path,
 			vars: HashMap::new(),
 			datatypes: HashMap::new(),
 		}
+	}
+	
+	pub fn path<'a>(&'a self) -> &'a String {
+		&self.path
 	}
 	
 	pub fn create_child(&self) -> Context {
@@ -97,6 +105,13 @@ impl Context {
 	pub fn add_macro(&mut self, id: &str, handle: &'static Fn(&Exp, &Context) -> RunVal) {
 		self.add_var(id.to_string(), RunVal::Macro(Macro(id.to_string(), Rc::new(handle))))
 	}
+	
+	pub fn import(&mut self, path: &str) -> RunVal {
+		eval_exp_inline(&Exp::Invoke(
+			Rc::new(Exp::Var("import".to_string())),
+			Rc::new(Exp::String(path.to_string())),
+		), self)
+	}
 }
 
 fn unwrap<T:Clone>(cat: &str, id: &Ident, opt: Option<&T>) -> T {
@@ -105,7 +120,8 @@ fn unwrap<T:Clone>(cat: &str, id: &Ident, opt: Option<&T>) -> T {
 
 pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 	match exp {
-		&Exp::Literal(n) => RunVal::Index(n),
+		&Exp::Nat(n) => RunVal::Index(n),
+		&Exp::String(ref s) => RunVal::String(s.to_string()),
 		&Exp::Var(ref id) => ctx.find_var(id),
 		&Exp::Scope(ref decls, ref ret) => {
 			let mut child = ctx.create_child();
@@ -154,6 +170,18 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 	}
 }
 
+pub fn eval_exp_inline(exp: &Exp, ctx: &mut Context) -> RunVal {
+	match exp {
+		Exp::Scope(ref decls, ref exp) => {
+			for decl in decls {
+				eval_decl(decl, ctx);
+			}
+			eval_exp(exp, ctx)
+		},
+		_ => eval_exp(&exp, ctx),
+	}
+}
+
 pub fn eval_decl(decl: &Decl, ctx: &mut Context) {
 	match decl {
 		&Decl::Data(ref id, ref variants) => {
@@ -195,6 +223,7 @@ pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Result<(), Erro
 pub fn build_state(val: RunVal) -> State {
 	match val {
 		RunVal::Index(n) => get_state(n),
+		RunVal::String(_) => unimplemented!(),
 		RunVal::Data(dt, index) => get_state(index).pad(dt.variants.len()),
 		RunVal::Tuple(vals) => vals.into_iter().fold(get_state(0), |a, b| a.combine(build_state(b))),
 		RunVal::Func(_ctx, _pat, _body) => unimplemented!(),

@@ -26,7 +26,8 @@ pub enum Decl {
 type ExpRc = Rc<Exp>;
 #[derive(Clone,Debug,PartialEq)]
 pub enum Exp {
-	Literal(usize),
+	Nat(usize),
+	String(String),
 	Var(Ident),
 	Scope(Vec<Decl>, ExpRc),
 	Tuple(Vec<Exp>),

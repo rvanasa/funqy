@@ -1,0 +1,56 @@
+use error::Error;
+use ast::Exp;
+use engine::*;
+use parser::parse_file;
+use eval::*;
+
+use std::path::Path;
+
+pub fn create_ctx(path: &str) -> Context {
+	let mut ctx = Context::new(path.to_string());
+	ctx.add_macro("import", &lib_import);
+	ctx.add_macro("sup", &lib_sup);
+	ctx.add_macro("phf", &lib_phf);
+	ctx.add_macro("gate", &lib_gate);
+	ctx.add_macro("inv", &lib_inv);
+	ctx.add_macro("measure", &lib_measure);
+	ctx
+}
+
+fn lib_import(exp: &Exp, ctx: &Context) -> RunVal {
+	match eval_exp(exp, ctx) {
+		RunVal::String(ref s) => {
+			let mut import_path = Path::new(ctx.path().as_str()).join(s.as_str());
+			let mut import_dir = import_path.clone();
+			import_dir.pop();
+			let mut import_ctx = create_ctx(import_dir.to_str().unwrap());
+			let exp = parse_file(format!("{}.fqy", import_path.to_string_lossy()).as_str()).expect("Failed to parse imported script");
+			eval_exp_inline(&exp, &mut import_ctx)
+		},
+		_ => panic!("Invalid import path"),
+	}
+}
+
+fn lib_sup(exp: &Exp, ctx: &Context) -> RunVal {
+	RunVal::State(match exp {
+		&Exp::Tuple(ref args) => create_sup(args.iter().map(|arg| build_state(eval_exp(arg, ctx))).collect()),
+		_ => build_state(eval_exp(exp, ctx)),
+	})
+}
+
+fn lib_phf(exp: &Exp, ctx: &Context) -> RunVal {
+	RunVal::State(build_state(eval_exp(exp, ctx)).phase_flip())
+}
+
+fn lib_gate(exp: &Exp, ctx: &Context) -> RunVal {
+	let val = eval_exp(exp, ctx);
+	RunVal::Tuple(build_gate(&val, ctx).unwrap_or_else(|| panic!("Not a gate: {}", val)).into_iter().map(RunVal::State).collect())
+}
+
+fn lib_inv(exp: &Exp, ctx: &Context) -> RunVal {
+	RunVal::Gate(build_gate(&eval_exp(exp, ctx), ctx).unwrap().inverse())
+}
+
+fn lib_measure(exp: &Exp, ctx: &Context) -> RunVal {
+	RunVal::Index(build_state(eval_exp(exp, ctx)).measure())
+}
