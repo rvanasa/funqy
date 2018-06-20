@@ -53,8 +53,8 @@ let (!) = x
 
 // Pauli-Y rotation
 fn py = {
-	F => [1/2] T,		//	|0⟩ => i|1⟩
-	T => [-1/2] F,		//	|1⟩ => -i|0⟩
+	F => @[1/2] T,		//	|0⟩ => i|1⟩
+	T => @[-1/2] F,		//	|1⟩ => -i|0⟩
 }
 
 // Pauli-Z rotation
@@ -77,10 +77,10 @@ fn swap = {
 }
 
 // sqrt(NOT) gate
-let sqrt_not = [1/2] not
+let sqrt_not = @[1/2] not
 
 // sqrt(SWAP) gate
-let sqrt_swap = [1/2] swap
+let sqrt_swap = @[1/2] swap
 
 // Controlled gate
 fn c(gate)(ctrl, tgt) = {

@@ -1,0 +1,5 @@
+data Unit = U
+
+fn random(n) = measure(repeat(U, n))
+
+random(10)

@@ -12,6 +12,7 @@ pub fn create_ctx(path: &str) -> Context {
 	ctx.add_macro("phf", &lib_phf);
 	ctx.add_macro("gate", &lib_gate);
 	ctx.add_macro("inv", &lib_inv);
+	ctx.add_macro("repeat", &lib_repeat);
 	ctx.add_macro("measure", &lib_measure);
 	ctx
 }
@@ -42,7 +43,10 @@ fn lib_sup(exp: &Exp, ctx: &Context) -> RunVal {
 }
 
 fn lib_phf(exp: &Exp, ctx: &Context) -> RunVal {
-	RunVal::State(build_state(eval_exp(exp, ctx)).phase_flip())
+	let val = eval_exp(exp, ctx);
+	build_gate(&val, ctx)
+		.map(|g| RunVal::Gate(g.negate()))
+		.unwrap_or_else(|| RunVal::State(build_state(val).phase_flip()))
 }
 
 fn lib_gate(exp: &Exp, ctx: &Context) -> RunVal {
@@ -52,6 +56,31 @@ fn lib_gate(exp: &Exp, ctx: &Context) -> RunVal {
 
 fn lib_inv(exp: &Exp, ctx: &Context) -> RunVal {
 	RunVal::Gate(build_gate(&eval_exp(exp, ctx), ctx).unwrap().inverse())
+}
+
+fn lib_repeat(exp: &Exp, ctx: &Context) -> RunVal {
+	fn do_repeat(state: State, n: usize) -> State {
+		let div = (n as f32).sqrt();
+		(0..n).flat_map(|_| state.iter().map(|s| s / div)).collect()
+	}
+	match exp {
+		&Exp::Tuple(ref args) => {
+			let val = eval_exp(&args[0], ctx);
+			match eval_exp(&args[1], ctx) {
+				RunVal::Index(n) => {
+					if let Some(gate) = build_gate(&val, ctx) {
+						let wide = gate.into_iter().map(|v| do_repeat(v, n)).collect();
+						RunVal::Gate(::std::iter::repeat(wide).take(n).flat_map(|g: Gate| g).collect())
+					}
+					else {
+						RunVal::State(do_repeat(build_state(val), n))
+					}
+				},
+				_ => panic!("Invalid `repeat` count"),
+			}
+		},
+		_ => panic!("Invalid `repeat` arguments"),
+	}
 }
 
 fn lib_measure(exp: &Exp, ctx: &Context) -> RunVal {

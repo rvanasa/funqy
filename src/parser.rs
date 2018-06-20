@@ -9,22 +9,31 @@ use regex::Regex;
 use nom;
 
 fn is_ident_char(c: u8) -> bool {
-	println!("{}",c as char);
-	return nom::is_alphanumeric(c) || c == b'_';
+	nom::is_alphanumeric(c) || c == b'_'
 }
 
 fn is_opr_char(c: u8) -> bool {
-	return b"~!@#%^&*/?|-+<>.".contains(&c);
+	b"~!@#%^&*/?|-+<>.".contains(&c)
 }
 
-named!(nat_literal<usize>, ws!(map_res!(
+named!(dec_literal<usize>, ws!(map_res!(
 	map_res!(take_while1!(nom::is_digit), ::std::str::from_utf8),
 	|s: &str| s.parse()
 )));
 
+named!(hex_literal<usize>, ws!(map_res!(
+	map_res!(preceded!(tag!("0x"), take_while1!(nom::is_hex_digit)), ::std::str::from_utf8),
+	|s: &str| usize::from_str_radix(s, 16)
+)));
+
+named!(bin_literal<usize>, ws!(map_res!(
+	map_res!(preceded!(tag!("0b"), is_a!("01")), ::std::str::from_utf8),
+	|s: &str| usize::from_str_radix(s, 2)
+)));
+
 named!(int_literal<isize>, do_parse!(
 	sig: opt!(value!(-1, tag!("-"))) >>
-	nat: nat_literal >>
+	nat: index_literal >>
 	(nat as isize * sig.unwrap_or(1))
 ));
 
@@ -41,8 +50,12 @@ named!(string_literal<String>, delimited!(
 	tag!("\"")
 ));
 
+named!(index_literal<usize>,
+	alt!(hex_literal | bin_literal | dec_literal)
+);
+
 named!(literal_exp<Exp>, alt!(
-	nat_literal => {Exp::Nat} |
+	index_literal => {Exp::Index} |
 	string_literal => {Exp::String}
 ));
 
@@ -68,10 +81,19 @@ named!(var_exp<Exp>, map!(
 named!(tuple_exp<Exp>, map!(
 	delimited!(
 		ws!(tag!("(")),
-		separated_list!(ws!(tag!(",")), exp),
+		separated_list!(ws!(tag!(",")), arg_exp),
 		ws!(tag!(")"))
 	),
-	|vec| if vec.len() == 1 {vec[0].clone()} else {Exp::Tuple(vec)}
+	|vec| if vec.len() == 1 && match vec[..] {[Exp::Tuple(_)] => false, _ => true} {vec[0].clone()} else {Exp::Tuple(vec)}
+));
+
+named!(concat_exp<Exp>, map!(
+	delimited!(
+		ws!(tag!("[")),
+		separated_list!(ws!(tag!(",")), arg_exp),
+		ws!(tag!("]"))
+	),
+	Exp::Concat
 ));
 
 named!(block_exp<Exp>,
@@ -134,6 +156,13 @@ named!(case<Vec<Case>>,
 	alt!(default_case | exp_case)
 );
 
+named!(cond_exp<Exp>, do_parse!(
+	cond_exp: preceded!(ws!(tag!("if")), exp) >>
+	then_exp: preceded!(ws!(tag!("then")), exp) >>
+	else_exp: preceded!(ws!(tag!("else")), exp) >>
+	(Exp::Cond(Rc::new(cond_exp), Rc::new(then_exp), Rc::new(else_exp)))
+));
+
 named!(lambda_exp<Exp>, do_parse!(
 	pat: delimited!(
 		ws!(tag!("\\")),
@@ -145,11 +174,11 @@ named!(lambda_exp<Exp>, do_parse!(
 ));
 
 named!(phase_exp<Exp>, do_parse!(
-	phase: delimited!(
+	phase: preceded!(ws!(tag!("@")), delimited!(
 		ws!(tag!("[")),
 		tuple!(phase, opt!(map!(preceded!(ws!(tag!(",")), phase), |p| p * Phase::i()))),
 		ws!(tag!("]"))
-	) >>
+	)) >>
 	exp: exp >>
 	(Exp::Phase(phase.0 + phase.1.unwrap_or(::num::Zero::zero()), Rc::new(exp)))
 ));
@@ -167,13 +196,18 @@ named!(phase<Phase>, do_parse!(
 ));
 
 named!(path_exp<Exp>,
-	alt!(extract_exp | literal_exp | var_exp | tuple_exp | block_exp | phase_exp | lambda_exp)
+	alt!(extract_exp | literal_exp | var_exp | tuple_exp | concat_exp | block_exp)
 );
 
 named!(decorated_exp<Exp>, do_parse!(
 	path: path_exp >>
 	invokes: many0!(tuple_exp) >>
 	(invokes.into_iter().fold(path, |a, b| Exp::Invoke(Rc::new(a), Rc::new(b))))
+));
+
+named!(arg_exp<Exp>, alt!(
+	preceded!(ws!(tag!("...")), exp) => {|exp| Exp::Expand(Rc::new(exp))} |
+	exp
 ));
 
 named!(prefix_opr_exp<Exp>, do_parse!(
@@ -183,7 +217,7 @@ named!(prefix_opr_exp<Exp>, do_parse!(
 ));
 
 named!(target_exp<Exp>,
-	alt!(prefix_opr_exp | decorated_exp)
+	alt!(phase_exp | prefix_opr_exp | cond_exp | decorated_exp | lambda_exp)
 );
 
 named!(exp<Exp>, do_parse!(

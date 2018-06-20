@@ -41,6 +41,7 @@ pub trait Stateful
 where Self: ::std::marker::Sized {
 	fn pad(self, n: usize) -> Self;
 	fn sup(self, s: Self) -> Self;
+	fn normalized(self) -> Self;
 	fn extract(self, vs: Vec<Self>) -> Self;
 	fn phase(self, p: Phase) -> Self;
 	fn phase_flip(self) -> Self;
@@ -60,8 +61,13 @@ impl Stateful for State {
 		create_sup(vec![self, s])
 	}
 	
-	fn extract(self, vs: Gate) -> State {
-		create_sup(self.into_iter().zip(vs).map(|(x, s)| {
+	fn normalized(self) -> State {
+		let div = self.prob_sum().sqrt();
+		self.into_iter().map(|s| s / div).collect()
+	}
+	
+	fn extract(self, g: Gate) -> State {
+		create_sup(self.into_iter().zip(g).map(|(x, s)| {
 			s.iter().map(|y| x * y).collect()
 		}).collect())
 	}
@@ -131,6 +137,7 @@ pub trait MatrixLike {
 	fn is_unitary(&self) -> bool;
 	
 	fn inverse(self) -> Self;
+	fn negate(self) -> Self;
 	fn power(self, Phase) -> Self;
 }
 
@@ -163,6 +170,10 @@ impl MatrixLike for Gate {
 			dims.push(dim);
 		}
 		dims
+	}
+	
+	fn negate(self) -> Self {
+		self.into_iter().map(|dim| dim.into_iter().map(|s| -s).collect()).collect()
 	}
 	
 	fn power(self, p: Phase) -> Self {

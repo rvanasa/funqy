@@ -99,8 +99,8 @@ print ibell(shared)
 assert data == decode(shared)
 
 fn py = {
-	F => [1/2] T,
-	T => [3/2] F,
+	F => @[1/2] T,
+	T => @[3/2] F,
 }
 
 fn rotate(r)(s) = extract r {
@@ -111,7 +111,7 @@ fn rotate(r)(s) = extract r {
 
 assert had(F) == rotate(X ^ Z)(F)
 
-fn sqrt(f) = [1/2] gate(f)
+fn sqrt(f) = @[1/2] gate(f)
 
 fn ctrl(c, fg, tg)(q) = extract c {
 	F => fg(q),

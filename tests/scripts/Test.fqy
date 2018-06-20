@@ -1,11 +1,22 @@
 data Bool = F | T
 
+let (~) = phf
+
 let _Test = import("_Test")
-let Prop = import("Prop")
+let Prop = import("examples/Prop")
 
-fn f = {
-	(F, T) => (T, F),
-	(T, F) => (F, T),
-}
+let flag = 0
 
-gate(f)
+let f = if flag
+	then extract {
+		(F, T) => @[1/2] (T, F),
+		(T, F) => @[-1/2] (F, T),
+	}
+	else extract {
+		(F, T) => (~T, ~F),
+		(T, F) => (~F, ~T),
+	}
+
+// phf(f)
+
+import("examples/Random")

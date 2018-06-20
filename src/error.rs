@@ -2,7 +2,7 @@ use std::fmt;
 use std::io;
 use nom;
 
-pub type Ret<T> = Result<T, Error>;
+pub type Ret<T = ()> = Result<T, Error>;
 
 #[derive(Clone, Debug)]
 pub struct Error(pub String);

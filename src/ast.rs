@@ -1,3 +1,5 @@
+use engine::Phase;
+
 use std::rc::Rc;
 
 pub type Ident = String;
@@ -26,15 +28,18 @@ pub enum Decl {
 type ExpRc = Rc<Exp>;
 #[derive(Clone,Debug,PartialEq)]
 pub enum Exp {
-	Nat(usize),
+	Index(usize),
 	String(String),
 	Var(Ident),
 	Scope(Vec<Decl>, ExpRc),
+	Expand(ExpRc),
 	Tuple(Vec<Exp>),
+	Concat(Vec<Exp>),
+	Cond(ExpRc, ExpRc, ExpRc),
 	Lambda(Pat, ExpRc),
 	Invoke(ExpRc, ExpRc),
 	State(ExpRc),
-	Phase(::engine::Phase, ExpRc),
+	Phase(Phase, ExpRc),
 	Extract(ExpRc, Vec<Case>),
 }
 

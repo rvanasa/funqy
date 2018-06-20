@@ -120,7 +120,7 @@ fn unwrap<T:Clone>(cat: &str, id: &Ident, opt: Option<&T>) -> T {
 
 pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 	match exp {
-		&Exp::Nat(n) => RunVal::Index(n),
+		&Exp::Index(n) => RunVal::Index(n),
 		&Exp::String(ref s) => RunVal::String(s.to_string()),
 		&Exp::Var(ref id) => ctx.find_var(id),
 		&Exp::Scope(ref decls, ref ret) => {
@@ -130,9 +130,14 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 			}
 			eval_exp(ret, &child)
 		},
-		&Exp::Tuple(ref args) => RunVal::Tuple(args.iter()
-			.map(|arg| eval_exp(arg, ctx))
-			.collect()),
+		&Exp::Expand(_) => panic!("No context for expansion"),
+		&Exp::Tuple(ref args) => RunVal::Tuple(eval_exp_seq(args, ctx)),
+		&Exp::Concat(ref args) => RunVal::State(args.iter()
+			.flat_map(|e| build_state(eval_exp(e, ctx)))
+			.collect::<State>().normalized()), // TODO gates
+		&Exp::Cond(ref cond_exp, ref then_exp, ref else_exp) => {
+			eval_exp(if build_bool(eval_exp(cond_exp, ctx)) {then_exp} else {else_exp}, ctx)
+		},
 		&Exp::Lambda(ref pat, ref body) => {
 			let fn_ctx = ctx.create_child(); // TODO optimize?
 			RunVal::Func(Rc::new(fn_ctx), pat.clone(), (**body).clone())
@@ -182,6 +187,18 @@ pub fn eval_exp_inline(exp: &Exp, ctx: &mut Context) -> RunVal {
 	}
 }
 
+pub fn eval_exp_seq(seq: &Vec<Exp>, ctx: &Context) -> Vec<RunVal> {
+	seq.iter().flat_map(|e| {
+		if let Exp::Expand(ref e) = e {
+			match eval_exp(e, ctx) {
+				RunVal::Tuple(args) => args,
+				_ => panic!("Cannot expand value")
+			}
+		}
+		else {vec![eval_exp(e, ctx)]}
+	}).collect()
+}
+
 pub fn eval_decl(decl: &Decl, ctx: &mut Context) {
 	match decl {
 		&Decl::Data(ref id, ref variants) => {
@@ -220,6 +237,14 @@ pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Result<(), Erro
 	}
 }
 
+pub fn build_bool(val: RunVal) -> bool {
+	match val {
+		RunVal::Index(n) => n > 0,
+		RunVal::Tuple(vec) => vec.len() > 0,
+		_ => panic!("Cannot convert to bool"),
+	}
+}
+
 pub fn build_state(val: RunVal) -> State {
 	match val {
 		RunVal::Index(n) => get_state(n),
@@ -229,7 +254,7 @@ pub fn build_state(val: RunVal) -> State {
 		RunVal::Func(_ctx, _pat, _body) => unimplemented!(),
 		RunVal::Macro(_mc) => unimplemented!(),
 		RunVal::State(state) => state,
-		RunVal::Gate(_state) => unimplemented!(),
+		RunVal::Gate(_gate) => unimplemented!(),
 		RunVal::Error(err) => panic!(err),
 	}
 }
