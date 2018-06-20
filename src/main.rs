@@ -16,8 +16,8 @@ fn main() {
 	let matches = clap_app!(funqy =>
 		(author: "Ryan Vandersmith (https://github.com/rvanasa)")
 		(about: "FunQy language command-line interface")
-		(@subcommand run =>
-			(about: "execute script using simulator")
+		(@subcommand eval =>
+			(about: "evaluate script using ideal simulator")
 			(@arg filename: +required "input filename")
 			(@arg output: -o --output +takes_value "output filename")
 		)
@@ -31,7 +31,7 @@ fn main() {
 		.expect("Could not find working directory")
 		.to_str().unwrap());
 	
-	if let Some(matches) = matches.subcommand_matches("run") {
+	if let Some(matches) = matches.subcommand_matches("eval") {
 		let result = ctx.import(matches.value_of("filename").unwrap());
 		println!(">> {}", result);
 		

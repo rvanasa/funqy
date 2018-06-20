@@ -122,7 +122,7 @@ let qft2 = (had, had)
 let qft4 = (qft2, qft2)
 // let qft8 = (qft4, qft4)
 
-// assert ctrl(had(F), px, py)(F) : [1/4] T
+// assert ctrl(had(F), px, py)(F) == [1/4] T
 
 let series = ^(0, 5, 10, 15)
 

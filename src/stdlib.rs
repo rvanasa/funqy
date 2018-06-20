@@ -1,4 +1,3 @@
-use error::Error;
 use ast::Exp;
 use engine::*;
 use parser::parse_file;
@@ -24,7 +23,11 @@ fn lib_import(exp: &Exp, ctx: &Context) -> RunVal {
 			let mut import_dir = import_path.clone();
 			import_dir.pop();
 			let mut import_ctx = create_ctx(import_dir.to_str().unwrap());
-			let exp = parse_file(format!("{}.fqy", import_path.to_string_lossy()).as_str()).expect("Failed to parse imported script");
+			let mut file = format!("{}", import_path.to_string_lossy());
+			if !file.ends_with(".fqy") {
+				file = format!("{}.fqy", file);
+			}
+			let exp = parse_file(file.as_str()).expect("Failed to parse imported script");
 			eval_exp_inline(&exp, &mut import_ctx)
 		},
 		_ => panic!("Invalid import path"),

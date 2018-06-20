@@ -1,5 +1,6 @@
 data Bool = F | T
 
+let Test = import("_Test")
 let Prop = import("Prop")
 
 fn f = {

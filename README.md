@@ -4,11 +4,28 @@ FunQy is a novel, purely functional, architecture-agnostic quantum programming l
 Instead of regarding algorithms in terms of [qubits](https://en.wikipedia.org/wiki/Qubit) and [logic gates](https://en.wikipedia.org/wiki/Quantum_logic_gate), 
 FunQy can simulate any combination of quantum objects using a technique we call _pattern extraction_. 
 
-Pattern extraction is a bidirectional subset of pattern matching in classical functional programming, 
-with the additional quantum ability for simultaneous execution of all paths. 
-This abstraction provides a clear understanding of the logic and performance benefits of a particular program; 
-instead of executing one path at a time, pattern extraction can execute arbitrary combinations of possible inputs. 
-This tends to be vastly more intuitive and scalable than the prevalent circuit-based algorithm conventions. 
+Pattern extraction is a bidirectional subset of pattern matching from classical functional programming, 
+with the additional quantum capability of executing all paths simultaneously. 
+This abstraction provides a clear understanding of the logic and performance benefits of a particular program—instead
+of executing one path at a time, pattern extraction can execute arbitrary combinations of possible inputs. 
+This tends to be vastly more intuitive and scalable than the prevalent [circuit-based algorithm](https://arxiv.org/abs/1804.03719) conventions. 
+
+### Build Requirements
+
+- [Nightly Rust](https://doc.rust-lang.org/1.15.1/book/nightly-rust.html) `>= 1.28.0`
+- [OpenBLAS](https://github.com/xianyi/OpenBLAS/wiki/Installation-Guide) `>= 0.2.20`
+
+### Usage Examples
+
+Evaluate a FunQy script (expects `.fqy` file extension):
+```sh
+$ funqy eval path/to/ScriptFile [-o output_file.txt]
+```
+
+Start an interactive REPL session:
+```sh
+$ funqy repl [-h history_file.txt]
+```
 
 ### Qubit Gate Analogy
 
