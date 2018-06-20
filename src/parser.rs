@@ -8,6 +8,15 @@ use regex::Regex;
 
 use nom;
 
+fn is_ident_char(c: u8) -> bool {
+	println!("{}",c as char);
+	return nom::is_alphanumeric(c) || c == b'_';
+}
+
+fn is_opr_char(c: u8) -> bool {
+	return b"~!@#%^&*/?|-+<>.".contains(&c);
+}
+
 named!(nat_literal<usize>, ws!(map_res!(
 	map_res!(take_while1!(nom::is_digit), ::std::str::from_utf8),
 	|s: &str| s.parse()
@@ -38,12 +47,12 @@ named!(literal_exp<Exp>, alt!(
 ));
 
 named!(name_ident<String>, ws!(map!(
-	map_res!(take_while1!(nom::is_alphanumeric), ::std::str::from_utf8),
+	map_res!(take_while1!(is_ident_char), ::std::str::from_utf8),
 	|s| s.to_string()
 )));
 
 named!(opr_ident<String>, ws!(map!(
-	map_res!(take_while1!(|c| "~!@#%^&*/?|-+<>.".contains(c as char)), ::std::str::from_utf8),
+	map_res!(take_while1!(is_opr_char), ::std::str::from_utf8),
 	|s| s.to_string()
 )));
 
@@ -273,7 +282,7 @@ named!(tuple_pat<Pat>, map!(
 ));
 
 named!(pat<Pat>,
-	alt!(wildcard_pat | var_pat | tuple_pat)
+	alt!(var_pat | wildcard_pat | tuple_pat)
 );
 
 pub fn parse_file(path: &str) -> Result<Exp, Error> {
