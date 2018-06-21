@@ -53,8 +53,8 @@ let (!) = x
 
 // Pauli-Y rotation
 fn py = {
-	F => @[1/2] T,		//	|0⟩ => i|1⟩
-	T => @[-1/2] F,		//	|1⟩ => -i|0⟩
+	F => @[1/2] T,		//	|0⟩ => |i⟩
+	T => @[-1/2] F,		//	|1⟩ => -|i⟩
 }
 
 // Pauli-Z rotation
