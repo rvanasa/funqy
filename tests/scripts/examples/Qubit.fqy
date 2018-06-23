@@ -1,0 +1,96 @@
+data Qubit = F | T		//	Define |0⟩ as `F` and |1⟩ as `T`
+
+let (^) = sup			// Define superposition operator
+let (~) = phf			// Define phase flip operator
+let (#) = measure		// Define measurement operator
+
+// identity (no change)
+fn id = {
+	F => F,				//	|0⟩ => |0⟩
+	T => T,				//	|1⟩ => |1⟩
+}
+
+// Pauli-X rotation (NOT gate)
+fn px = {
+	F => T,				//	|0⟩ => |1⟩
+	T => F,				//	|1⟩ => |0⟩
+}
+let not = px
+let (!) = px
+
+// Pauli-Y rotation
+fn py = {
+	F => @[1/2] T,		//	|0⟩ => |i⟩
+	T => @[-1/2] F,		//	|1⟩ => -|i⟩
+}
+
+// Pauli-Z rotation
+fn pz = {
+	F => F,				//	|0⟩ => |0⟩
+	T => ~T,			//	|1⟩ => -|1⟩
+}
+
+// Hadamard gate
+fn hadamard = {
+	F => F ^ T, 		//	|0⟩ => (|0⟩ + |1⟩) / sqrt(2)
+	T => F ^ ~T,		//	|1⟩ => (|0⟩ - |1⟩) / sqrt(2)
+}
+
+// Alternate implementation using if/then/else statement
+fn hadamard_cond(s) =
+	if s then F ^ T else F ^ ~T
+
+// SWAP gate
+fn swap = {
+	(F, T) => (T, F), 	//	|01⟩ => |10⟩
+	(T, F) => (F, T),	//	|10⟩ => |01⟩
+}
+
+// sqrt(NOT) gate
+let sqrt_not = @[1/2] not
+
+// sqrt(SWAP) gate
+let sqrt_swap = @[1/2] swap
+
+// Controlled gate
+fn c(gate)(ctrl, tgt) = {
+	let out = extract ctrl {
+		F => tgt, 		//	|0⟩ ⊗ tgt => |0⟩ ⊗ tgt 
+		T => gate(tgt),	//	|1⟩ ⊗ tgt => |0⟩ ⊗ gate(tgt)
+	}
+	(ctrl, out)
+}
+
+// Controlled NOT gate
+fn cnot(ctrl, tgt) = c(not)(ctrl, tgt)
+
+// Bell state preparation (implemented via gates)
+fn bell_as_circuit(q1, q2) = cnot(hadamard(q1), q2)
+
+// Bell state preparation (implemented via extraction)
+fn bell_as_extract = {
+	(F, F) => (F, F) ^ (T, T),
+	(F, T) => (F, T) ^ (T, F),
+	(T, F) => (F, F) ^ ~(T, T),
+	(T, T) => (F, T) ^ ~(T, F),
+}
+
+// assert bell_as_circuit == bell_as_extract
+
+// let inv_bell = inv(bell_as_circuit)
+// assert inv(inv_bell) == bell_as_circuit
+
+
+// Higher-order gate construction
+
+data Axis3 = X | Y | Z
+
+fn rotate(r)(s) = extract r {
+	X => px(s),
+	Y => py(s),
+	Z => pz(s),
+}
+
+let f = rotate(^(X, ~Y, Z))
+print f(F)
+print f(T)

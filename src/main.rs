@@ -3,14 +3,18 @@
 #[macro_use]
 extern crate clap;
 extern crate rustyline;
+extern crate notify;
 extern crate funqy;
+
+use funqy::{parser, eval, stdlib};
 
 use std::env;
 use std::fs;
+use std::sync::mpsc::channel;
+use std::time::Duration;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
-
-use funqy::{parser, eval, stdlib};
+use notify::{Watcher, RecursiveMode, DebouncedEvent, watcher};
 
 fn main() {
 	let matches = clap_app!(funqy =>
@@ -20,6 +24,7 @@ fn main() {
 			(about: "evaluate script using ideal simulator")
 			(@arg filename: +required "input filename")
 			(@arg output: -o --output +takes_value "output filename")
+			(@arg watch: -w --watch "re-evaluate with optimizations on file change")
 		)
 		(@subcommand repl =>
 			(about: "begin REPL session")
@@ -32,12 +37,36 @@ fn main() {
 		.to_str().unwrap());
 	
 	if let Some(matches) = matches.subcommand_matches("eval") {
-		let result = ctx.import(matches.value_of("filename").unwrap());
-		println!(">> {}", result);
+		let do_eval = |module: &eval::Module| {
+			let result = eval::eval_exp(&module.exp, &ctx);
+			println!(">> {}", result);
+			if let Some(output) = matches.value_of("output") {
+				fs::write(output, format!("{}", result))
+					.expect("Could not write output file");
+			}
+		};
+		let mut module = ctx.import(matches.value_of("filename").unwrap());
+		do_eval(&module);
 		
-		if let Some(output) = matches.value_of("output") {
-			fs::write(output, format!("{}", result))
-				.expect("Could not write output file");
+		if matches.is_present("watch") {
+			println!("Watching for changes.");
+			let (tx, rx) = channel();
+			let mut watcher = watcher(tx, Duration::from_millis(100)).expect("Could not init watcher");
+			watcher.watch(module.path.clone(), RecursiveMode::NonRecursive).expect("Could not watch file"); // TODO follow imports
+			loop {
+				match rx.recv() {
+					Ok(DebouncedEvent::Write(_)) => {
+						let new_module = ctx.import(module.path.as_str());
+						if module.exp != new_module.exp {
+							println!("--");
+							module = new_module;
+							do_eval(&module);
+						}
+					},
+					Ok(_) => {},
+					Err(err) => panic!(err),
+				}
+			}
 		}
 	}
 	else if let Some(matches) = matches.subcommand_matches("repl") {

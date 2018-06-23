@@ -3,7 +3,7 @@ use funqy::stdlib::*;
 
 #[test]
 fn test_parser() {
-	let mut ctx = create_ctx("tests/scripts");
+	let ctx = create_ctx("tests/scripts");
 	// println!("{:?}", exp);
-	println!("\n>> {}\n", ctx.import("Test")/*.expect("Could not parse file")*/);
+	println!("\n>> {}\n", ctx.import_eval("Test")/*.expect("Could not parse file")*/);
 }

@@ -1,6 +1,7 @@
+use error::*;
 use ast::Exp;
+use parser::parse_resource;
 use engine::*;
-use parser::parse_file;
 use eval::*;
 
 use std::path::Path;
@@ -12,6 +13,8 @@ pub fn create_ctx(path: &str) -> Context {
 	ctx.add_macro("phf", &lib_phf);
 	ctx.add_macro("gate", &lib_gate);
 	ctx.add_macro("inv", &lib_inv);
+	ctx.add_macro("slice", &lib_slice);
+	ctx.add_macro("fourier", &lib_fourier);
 	ctx.add_macro("repeat", &lib_repeat);
 	ctx.add_macro("measure", &lib_measure);
 	ctx
@@ -19,18 +22,7 @@ pub fn create_ctx(path: &str) -> Context {
 
 fn lib_import(exp: &Exp, ctx: &Context) -> RunVal {
 	match eval_exp(exp, ctx) {
-		RunVal::String(ref s) => {
-			let mut import_path = Path::new(ctx.path().as_str()).join(s.as_str());
-			let mut import_dir = import_path.clone();
-			import_dir.pop();
-			let mut import_ctx = create_ctx(import_dir.to_str().unwrap());
-			let mut file = format!("{}", import_path.to_string_lossy());
-			if !file.ends_with(".fqy") {
-				file = format!("{}.fqy", file);
-			}
-			let exp = parse_file(file.as_str()).expect("Failed to parse imported script");
-			eval_exp_inline(&exp, &mut import_ctx)
-		},
+		RunVal::String(ref s) => ctx.import_eval(s.as_str()),
 		_ => panic!("Invalid import path"),
 	}
 }
@@ -55,7 +47,45 @@ fn lib_gate(exp: &Exp, ctx: &Context) -> RunVal {
 }
 
 fn lib_inv(exp: &Exp, ctx: &Context) -> RunVal {
-	RunVal::Gate(build_gate(&eval_exp(exp, ctx), ctx).unwrap().inverse())
+	let val = &eval_exp(exp, ctx);
+	RunVal::Gate(build_gate(&val, ctx).unwrap_or_else(|| panic!("Not a gate: {}", val)).inverse())
+}
+
+fn lib_slice(exp: &Exp, ctx: &Context) -> RunVal {
+	fn to_slice_params(val: RunVal) -> Ret<(usize, usize)> {
+		match val {
+			RunVal::Index(n) => Ok((0, n)),
+			RunVal::Tuple(args) => {
+				if let [RunVal::Index(a), RunVal::Index(b)] = args[..] {
+					if a <= b {Ok((a, b))}
+					else {Err(Error(format!("Invalid slice arguments: {} > {}", a, b)))}
+				}
+				else {Err(Error(format!("Invalid slice arguments")))}
+			},
+			_ => Err(Error(format!("Invalid slice: {}", val))),
+		}
+	}
+	match exp {
+		&Exp::Tuple(ref args) if args.len() == 2 => {
+			let state = build_state(eval_exp(&args[0], ctx));
+			let (a, b) = to_slice_params(eval_exp(&args[1], ctx)).unwrap();
+			RunVal::State(state.into_iter().chain(::std::iter::repeat(::num::Zero::zero())).skip(a).take(b - a).collect())
+		},
+		_ => panic!("Invalid `slice` arguments"),
+	}
+}
+
+fn lib_fourier(exp: &Exp, ctx: &Context) -> RunVal {
+	// TODO change to function with explicit period?
+	let state = build_state(eval_exp(exp, ctx));
+	let len = state.len();
+	let w = (2_f32 * ::std::f32::consts::PI * Cf32::i() / len as f32).exp();
+	let div = (len as f32).sqrt();
+	RunVal::State((0..len)
+		.map(|i| state.iter().enumerate()
+			.map(|(j, s)| s * w.powc(Cf32::new((i * j) as f32, 0_f32)))
+			.fold(Cf32::new(0_f32, 0_f32), |a, b| a + b) / div)
+		.collect())
 }
 
 fn lib_repeat(exp: &Exp, ctx: &Context) -> RunVal {
@@ -64,7 +94,7 @@ fn lib_repeat(exp: &Exp, ctx: &Context) -> RunVal {
 		(0..n).flat_map(|_| state.iter().map(|s| s / div)).collect()
 	}
 	match exp {
-		&Exp::Tuple(ref args) => {
+		&Exp::Tuple(ref args) if args.len() == 2 => {
 			let val = eval_exp(&args[0], ctx);
 			match eval_exp(&args[1], ctx) {
 				RunVal::Index(n) => {

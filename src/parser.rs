@@ -1,8 +1,8 @@
+use error::*;
+use resource;
 use ast::*;
 use engine::Phase;
-use error::Error;
 
-use std::fs;
 use std::rc::Rc;
 use regex::Regex;
 
@@ -13,7 +13,7 @@ fn is_ident_char(c: u8) -> bool {
 }
 
 fn is_opr_char(c: u8) -> bool {
-	b"~!@#%^&*/?|-+<>.".contains(&c)
+	b"~!@#$%^&*/?|-+<>.".contains(&c)
 }
 
 named!(dec_literal<usize>, ws!(map_res!(
@@ -254,28 +254,28 @@ named!(data_val<Ident>,
 	alt!(ident)
 );
 
-named!(func_decl<Decl>, do_parse!(
+named!(fn_decl<Decl>, do_parse!(
 	ws!(tag!("fn")) >>
 	id: ident >>
-	part: func_part >>
+	part: fn_part >>
 	(Decl::Let(Pat::Var(id), part))
 ));
 
-named!(func_basic_part<Exp>, do_parse!(
+named!(fn_basic_part<Exp>, do_parse!(
 	pat: many1!(tuple_pat) >>
 	ws!(tag!("=")) >>
 	body: exp >>
 	(pat.into_iter().rev().fold(body, |exp, pat| Exp::Lambda(pat, Rc::new(exp))))
 ));
 
-named!(func_extract_part<Exp>, do_parse!(
+named!(fn_extract_part<Exp>, do_parse!(
 	opt!(ws!(tag!("="))) >>
 	cases: extract_cases >>
 	(Exp::Lambda(Pat::Var("$arg".to_string()), Rc::new(Exp::Extract(Rc::new(Exp::Var("$arg".to_string())), cases))))
 ));
 
-named!(func_part<Exp>,
-	alt!(func_basic_part | func_extract_part)
+named!(fn_part<Exp>,
+	alt!(fn_basic_part | fn_extract_part)
 );
 
 named!(assert_decl<Decl>, do_parse!(
@@ -293,7 +293,7 @@ named!(print_decl<Decl>, do_parse!(
 ));
 
 named!(decl<Decl>,
-	alt!(let_decl | data_decl | func_decl | assert_decl | print_decl)
+	alt!(let_decl | data_decl | fn_decl | assert_decl | print_decl)
 );
 
 named!(wildcard_pat<Pat>, do_parse!(
@@ -319,11 +319,11 @@ named!(pat<Pat>,
 	alt!(var_pat | wildcard_pat | tuple_pat)
 );
 
-pub fn parse_file(path: &str) -> Result<Exp, Error> {
-	parse(String::from_utf8_lossy(&fs::read(path)?).to_string())
+pub fn parse_resource(path: &str) -> Ret<Exp> {
+	parse(resource::load(path)?)
 }
 
-pub fn parse(input: String) -> Result<Exp, Error> {
+pub fn parse(input: String) -> Ret<Exp> {
 	let input = input + "\n";
 	let input = Regex::new("//[^\n]*\n").unwrap().replace_all(&input[..], " ");
 	match scope_exp(input.as_bytes()) {

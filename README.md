@@ -48,8 +48,8 @@ fn px = {
 	F => T,				//	|0⟩ => |1⟩
 	T => F,				//	|1⟩ => |0⟩
 }
-let not = x
-let (!) = x
+let not = px
+let (!) = px
 
 // Pauli-Y rotation
 fn py = {
@@ -69,11 +69,14 @@ fn hadamard = {
 	T => F ^ ~T,		//	|1⟩ => (|0⟩ - |1⟩) / sqrt(2)
 }
 
+// Alternate implementation using if/then/else statement
+fn hadamard_cond(s) =
+	if s then F ^ T else F ^ ~T
+
 // SWAP gate
 fn swap = {
 	(F, T) => (T, F), 	//	|01⟩ => |10⟩
 	(T, F) => (F, T),	//	|10⟩ => |01⟩
-	_ => _,				//	identity
 }
 
 // sqrt(NOT) gate
@@ -87,7 +90,7 @@ fn c(gate)(ctrl, tgt) = {
 	let out = extract ctrl {
 		F => tgt, 		//	|0⟩ ⊗ tgt => |0⟩ ⊗ tgt 
 		T => gate(tgt),	//	|1⟩ ⊗ tgt => |0⟩ ⊗ gate(tgt)
-	})
+	}
 	(ctrl, out)
 }
 
@@ -134,10 +137,9 @@ fn rotate(r)(s) = extract r {
 assert rotate(X) == px
 assert rotate(Y) == py
 assert rotate(Z) == pz
+assert rotate(X ^ Z) == hadamard	// it's back
 
-// Rotating a value by a superposition of the Pauli X and Z gates is equivalent to the Hadamard gate
-assert hadamard(F) == rotate(X ^ Z)(F)
-assert hadamard(T) == rotate(X ^ Z)(T)
+// assert rotate(^(X, ~Y, @[1/2] Z)) == ...
 
 ```
 

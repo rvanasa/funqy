@@ -1,5 +1,6 @@
 use std::fmt;
 use std::io;
+use reqwest;
 use nom;
 
 pub type Ret<T = ()> = Result<T, Error>;
@@ -27,5 +28,11 @@ impl<I> From<nom::Err<I>> for Error where I: fmt::Debug {
 			// nom::Err::Failure(ctx) => display_context!(ctx),
 			_ => format!("{:?}", err)
 		})
+	}
+}
+
+impl From<reqwest::Error> for Error {
+	fn from(error: reqwest::Error) -> Self {
+		Error(format!("{:?}", error))
 	}
 }

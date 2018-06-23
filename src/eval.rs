@@ -106,12 +106,32 @@ impl Context {
 		self.add_var(id.to_string(), RunVal::Macro(Macro(id.to_string(), Rc::new(handle))))
 	}
 	
-	pub fn import(&mut self, path: &str) -> RunVal {
-		eval_exp_inline(&Exp::Invoke(
-			Rc::new(Exp::Var("import".to_string())),
-			Rc::new(Exp::String(path.to_string())),
-		), self)
+	pub fn import(&self, path: &str) -> Module {
+		use std::path::Path;
+		use resource;
+		use stdlib;
+		use parser;
+		
+		let mut import_path = Path::new(self.path().as_str()).join(resource::with_ext(path, "fqy").as_str());
+		let mut import_dir = import_path.clone();
+		import_dir.pop();
+		let ctx = stdlib::create_ctx(import_dir.to_str().unwrap());
+		let file = format!("{}", import_path.to_string_lossy());
+		let exp = parser::parse_resource(file.as_str()).expect("Failed to parse imported script");
+		Module {path: file, exp: exp, ctx: ctx}
 	}
+	
+	pub fn import_eval(&self, path: &str) -> RunVal {
+		let mut module = self.import(path);
+		eval_exp_inline(&module.exp, &mut module.ctx)
+	}
+}
+
+#[derive(Clone,Debug,PartialEq)]
+pub struct Module {
+	pub path: String,
+	pub exp: Exp,
+	pub ctx: Context,
 }
 
 fn unwrap<T:Clone>(cat: &str, id: &Ident, opt: Option<&T>) -> T {
@@ -136,7 +156,20 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 			.flat_map(|e| build_state(eval_exp(e, ctx)))
 			.collect::<State>().normalized()), // TODO gates
 		&Exp::Cond(ref cond_exp, ref then_exp, ref else_exp) => {
-			eval_exp(if build_bool(eval_exp(cond_exp, ctx)) {then_exp} else {else_exp}, ctx)
+			let val = eval_exp(cond_exp, ctx);
+			if let Some(b) = build_bool(&val) {
+				eval_exp(if b {then_exp} else {else_exp}, ctx)
+			}
+			else {
+				let state = build_state(val);
+				if state.len() > 2 {
+					panic!("Conditional state canot be {}-dimensional", state.len())
+				}
+				RunVal::State(state.extract(vec![
+					build_state(eval_exp(else_exp, ctx)),
+					build_state(eval_exp(then_exp, ctx)),
+				]))
+			}
 		},
 		&Exp::Lambda(ref pat, ref body) => {
 			let fn_ctx = ctx.create_child(); // TODO optimize?
@@ -237,11 +270,11 @@ pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Result<(), Erro
 	}
 }
 
-pub fn build_bool(val: RunVal) -> bool {
+pub fn build_bool(val: &RunVal) -> Option<bool> {
 	match val {
-		RunVal::Index(n) => n > 0,
-		RunVal::Tuple(vec) => vec.len() > 0,
-		_ => panic!("Cannot convert to bool"),
+		&RunVal::Index(n) => Some(n > 0),
+		&RunVal::Tuple(ref vec) => Some(vec.len() > 0),
+		_ => None,
 	}
 }
 
