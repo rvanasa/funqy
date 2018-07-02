@@ -3,9 +3,10 @@ data Bool = F | T
 let (^) = sup
 let (~) = phf
 
-// let _Test = import("_Test")
-// let Prop = import("examples/Prop")
-// let Random = import("examples/Random")
+let _Test = import("_Test")
+let Prop = import("examples/Prop")
+let Random = import("examples/Random")
+let Fourier = import("examples/Fourier")
 
 let f = if 0
 	then extract {
@@ -17,4 +18,4 @@ let f = if 0
 		(T, F) => (~F, ~T),
 	}
 
-import("examples/Fourier")
+import("examples/ESVI")

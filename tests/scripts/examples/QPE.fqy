@@ -1,0 +1,13 @@
+// Quantum Phase (Eigenvalue) Estimation
+
+data Bool = F | T
+let (^) = sup
+
+fn QPE(g) = {
+	
+}
+
+QPE(extract {
+	F => T,
+	T => F,
+})

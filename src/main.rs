@@ -38,7 +38,7 @@ fn main() {
 	
 	if let Some(matches) = matches.subcommand_matches("eval") {
 		let do_eval = |module: &eval::Module| {
-			let result = eval::eval_exp(&module.exp, &ctx);
+			let result = eval::eval_exp(&module.exp, &module.ctx);
 			println!(">> {}", result);
 			if let Some(output) = matches.value_of("output") {
 				fs::write(output, format!("{}", result))

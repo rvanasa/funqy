@@ -1,3 +1,5 @@
+// Propositional logic analogy
+
 data Bool = F | T
 
 fn not = {

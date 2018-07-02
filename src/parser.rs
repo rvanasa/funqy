@@ -16,6 +16,10 @@ fn is_opr_char(c: u8) -> bool {
 	b"~!@#$%^&*/?|-+<>.".contains(&c)
 }
 
+fn with_anno(exp: Exp, anno: Option<Pat>) -> Exp {
+	if let Some(pat) = anno {Exp::Anno(Rc::new(exp), pat)} else {exp}
+}
+
 named!(dec_literal<usize>, ws!(map_res!(
 	map_res!(take_while1!(nom::is_digit), ::std::str::from_utf8),
 	|s: &str| s.parse()
@@ -114,13 +118,11 @@ named!(extract_exp<Exp>, do_parse!(
 	ws!(tag!("extract")) >>
 	exp: opt!(exp) >>
 	cases: extract_cases >>
-	({
-		match exp {
-			None => Exp::Lambda(
-				Pat::Var("$arg".to_string()),
-				Rc::new(Exp::Extract(Rc::new(Exp::Var("$arg".to_string())), cases))),
-			Some(exp) => Exp::Extract(Rc::new(exp), cases),
-		}
+	(match exp {
+		None => Exp::Lambda(
+			Pat::Var("$arg".to_string()),
+			Rc::new(Exp::Extract(Rc::new(Exp::Var("$arg".to_string())), cases))),
+		Some(exp) => Exp::Extract(Rc::new(exp), cases),
 	})
 ));
 
@@ -205,6 +207,12 @@ named!(decorated_exp<Exp>, do_parse!(
 	(invokes.into_iter().fold(path, |a, b| Exp::Invoke(Rc::new(a), Rc::new(b))))
 ));
 
+named!(anno_exp<Exp>, do_parse!(
+	exp: decorated_exp >>
+	anno: opt_anno >>
+	(with_anno(exp, anno))
+));
+
 named!(arg_exp<Exp>, alt!(
 	preceded!(ws!(tag!("...")), exp) => {|exp| Exp::Expand(Rc::new(exp))} |
 	exp
@@ -217,7 +225,7 @@ named!(prefix_opr_exp<Exp>, do_parse!(
 ));
 
 named!(target_exp<Exp>,
-	alt!(phase_exp | prefix_opr_exp | cond_exp | decorated_exp | lambda_exp)
+	alt!(phase_exp | prefix_opr_exp | cond_exp | anno_exp | lambda_exp)
 );
 
 named!(exp<Exp>, do_parse!(
@@ -241,6 +249,7 @@ named!(data_decl<Decl>, do_parse!(
 	ws!(tag!("data")) >>
 	id: ident >>
 	ws!(tag!("=")) >>
+	opt!(complete!(ws!(tag!("|")))) >>
 	variant: data_val >>
 	variants: many0!(preceded!(ws!(tag!("|")), data_val)) >>
 	(Decl::Data(id, {
@@ -263,9 +272,10 @@ named!(fn_decl<Decl>, do_parse!(
 
 named!(fn_basic_part<Exp>, do_parse!(
 	pat: many1!(tuple_pat) >>
+	anno: opt_anno >>
 	ws!(tag!("=")) >>
 	body: exp >>
-	(pat.into_iter().rev().fold(body, |exp, pat| Exp::Lambda(pat, Rc::new(exp))))
+	(pat.into_iter().rev().fold(with_anno(body, anno), |e, p| Exp::Lambda(p, Rc::new(e))))
 ));
 
 named!(fn_extract_part<Exp>, do_parse!(
@@ -298,7 +308,7 @@ named!(decl<Decl>,
 
 named!(wildcard_pat<Pat>, do_parse!(
 	ws!(tag!("_")) >>
-	(Pat::Wildcard)
+	(Pat::Any)
 ));
 
 named!(var_pat<Pat>, map!(
@@ -315,9 +325,13 @@ named!(tuple_pat<Pat>, map!(
 	|vec| if vec.len() == 1 {vec[0].clone()} else {Pat::Tuple(vec)}
 ));
 
-named!(pat<Pat>,
-	alt!(var_pat | wildcard_pat | tuple_pat)
-);
+named!(pat<Pat>, do_parse!(
+	pat: alt!(var_pat | wildcard_pat | tuple_pat) >>
+	anno: opt_anno >>
+	(if let Some(anno) = anno {Pat::Anno(Rc::new(pat), Rc::new(anno))} else {pat})
+));
+
+named!(opt_anno<Option<Pat>>, opt!(complete!(preceded!(ws!(tag!(":")), pat))));
 
 pub fn parse_resource(path: &str) -> Ret<Exp> {
 	parse(resource::load(path)?)

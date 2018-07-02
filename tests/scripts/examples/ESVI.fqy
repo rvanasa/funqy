@@ -1,0 +1,16 @@
+// Elder Scrolls VI location superposition example
+// Probabilities from http://fandom.wikia.com/articles/elder-scrolls-6-location-setting-guide
+
+data Location =
+	| HighRock
+	| Valenwood
+	| Elsweyr
+	| Hammerfell
+	| Argonia
+	| Akavir
+	| Atmora
+	| Alinor
+
+let chances = weighted(1, 4, 2, 4, 4, 2, 0, 1)
+
+measure(chances) : Location

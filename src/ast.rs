@@ -7,10 +7,11 @@ pub type Ident = String;
 // Pattern (e.g. function parameters, match/extract cases)
 #[derive(Clone,Debug,PartialEq)]
 pub enum Pat {
-	Wildcard,
+	Any,
 	Var(Ident),
 	Tuple(Vec<Pat>),
 	// Data(Ident, PatRc),
+	Anno(Rc<Pat>, Rc<Pat>),
 }
 
 // Scope declaration (statement)
@@ -41,6 +42,7 @@ pub enum Exp {
 	State(ExpRc),
 	Phase(Phase, ExpRc),
 	Extract(ExpRc, Vec<Case>),
+	Anno(ExpRc, Pat),
 }
 
 #[derive(Clone,Debug,PartialEq)]

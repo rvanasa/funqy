@@ -1,10 +1,7 @@
 use error::*;
 use ast::Exp;
-use parser::parse_resource;
 use engine::*;
 use eval::*;
-
-use std::path::Path;
 
 pub fn create_ctx(path: &str) -> Context {
 	let mut ctx = Context::new(path.to_string());
@@ -13,7 +10,9 @@ pub fn create_ctx(path: &str) -> Context {
 	ctx.add_macro("phf", &lib_phf);
 	ctx.add_macro("gate", &lib_gate);
 	ctx.add_macro("inv", &lib_inv);
+	ctx.add_macro("len", &lib_len);
 	ctx.add_macro("slice", &lib_slice);
+	ctx.add_macro("weighted", &lib_weighted);
 	ctx.add_macro("fourier", &lib_fourier);
 	ctx.add_macro("repeat", &lib_repeat);
 	ctx.add_macro("measure", &lib_measure);
@@ -47,8 +46,15 @@ fn lib_gate(exp: &Exp, ctx: &Context) -> RunVal {
 }
 
 fn lib_inv(exp: &Exp, ctx: &Context) -> RunVal {
-	let val = &eval_exp(exp, ctx);
+	let val = eval_exp(exp, ctx);
 	RunVal::Gate(build_gate(&val, ctx).unwrap_or_else(|| panic!("Not a gate: {}", val)).inverse())
+}
+
+fn lib_len(exp: &Exp, ctx: &Context) -> RunVal {
+	let val = eval_exp(exp, ctx);
+	RunVal::Index(build_gate(&val, ctx)
+		.map(|g| g.len())
+		.unwrap_or_else(|| build_state(val).len()))
 }
 
 fn lib_slice(exp: &Exp, ctx: &Context) -> RunVal {
@@ -75,17 +81,42 @@ fn lib_slice(exp: &Exp, ctx: &Context) -> RunVal {
 	}
 }
 
+fn lib_weighted(exp: &Exp, ctx: &Context) -> RunVal {
+	match exp {
+		&Exp::Tuple(ref args) => {
+			let weights: State = args.iter().map(|arg| {
+				let val = eval_exp(arg, ctx);
+				if let RunVal::Index(n) = val {Cf32::new(n as f32, 0_f32)}
+				else {panic!("Invalid weight: {}", val)}
+			}).collect();
+			let div = weights.iter().fold(Cf32::new(0_f32, 0_f32), |a, b| a + b).sqrt();
+			RunVal::State(weights.into_iter().map(|w| w.sqrt() / div).collect())
+		},
+		_ => panic!("Invalid `weighted` arguments"),
+	}
+}
+
 fn lib_fourier(exp: &Exp, ctx: &Context) -> RunVal {
-	// TODO change to function with explicit period?
-	let state = build_state(eval_exp(exp, ctx));
-	let len = state.len();
-	let w = (2_f32 * ::std::f32::consts::PI * Cf32::i() / len as f32).exp();
-	let div = (len as f32).sqrt();
-	RunVal::State((0..len)
-		.map(|i| state.iter().enumerate()
-			.map(|(j, s)| s * w.powc(Cf32::new((i * j) as f32, 0_f32)))
-			.fold(Cf32::new(0_f32, 0_f32), |a, b| a + b) / div)
-		.collect())
+	// let state = build_state(eval_exp(exp, ctx));
+	// let len = state.len();
+	// let w = (2_f32 * ::std::f32::consts::PI * Cf32::i() / len as f32).exp();
+	// let div = (len as f32).sqrt();
+	// RunVal::State((0..len)
+	// 	.map(|i| state.iter().enumerate()
+	// 		.map(|(j, s)| s * w.powc(Cf32::new((i * j) as f32, 0_f32)))
+	// 		.fold(Cf32::new(0_f32, 0_f32), |a, b| a + b) / div)
+	// 	.collect())
+	match eval_exp(exp, ctx) {
+		RunVal::Index(n) if n > 0 => {
+			let w = (2_f32 * ::std::f32::consts::PI * Cf32::i() / n as f32).exp();
+			RunVal::Gate((0..n)
+				.map(|i| (0..n)
+					.map(|j| w.powc(Cf32::new((i * j) as f32, 0_f32)))
+					.collect())
+				.collect())
+		},
+		val => panic!("Invalid size argument: {}", val),
+	}
 }
 
 fn lib_repeat(exp: &Exp, ctx: &Context) -> RunVal {
