@@ -129,9 +129,7 @@ fn lib_repeat(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 						let wide = gate.into_iter().map(|v| do_repeat(v, n)).collect();
 						Ok(RunVal::Gate(::std::iter::repeat(wide).take(n).flat_map(|g: Gate| g).collect()))
 					}
-					else {
-						Ok(RunVal::State(do_repeat(build_state(val), n), Type::Any))
-					}
+					else {Ok(RunVal::State(do_repeat(build_state(val), n), Type::Any))}
 				},
 				_ => err!("Invalid `repeat` count"),
 			}

@@ -10,7 +10,7 @@ pub enum Pat {
 	Any,
 	Var(Ident),
 	Tuple(Vec<Pat>),
-	// Data(Ident, PatRc),
+	// Data(Ident, Rc<Pat>),
 	Anno(Rc<Pat>, Rc<Pat>),
 }
 
@@ -22,7 +22,6 @@ pub enum Decl {
 	Data(Ident, Vec<Ident>),
 	Assert(Exp, Exp),
 	Print(Exp),
-	// Func(Pat, Exp),
 }
 
 // Expression
@@ -45,6 +44,7 @@ pub enum Exp {
 	Anno(ExpRc, Pat),
 }
 
+// Extract case
 #[derive(Clone,Debug,PartialEq)]
 pub enum Case {
 	Exp(Exp, Exp),
