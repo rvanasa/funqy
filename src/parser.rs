@@ -245,6 +245,14 @@ named!(let_decl<Decl>, do_parse!(
 	(Decl::Let(pat, exp))
 ));
 
+named!(type_decl<Decl>, do_parse!(
+	ws!(tag!("type")) >>
+	id: ident >>
+	ws!(tag!("=")) >>
+	pat: pat >>
+	(Decl::Type(id, pat))
+));
+
 named!(data_decl<Decl>, do_parse!(
 	ws!(tag!("data")) >>
 	id: ident >>
@@ -303,7 +311,7 @@ named!(print_decl<Decl>, do_parse!(
 ));
 
 named!(decl<Decl>,
-	alt!(let_decl | data_decl | fn_decl | assert_decl | print_decl)
+	alt!(let_decl | fn_decl | data_decl | type_decl | assert_decl | print_decl)
 );
 
 named!(wildcard_pat<Pat>, do_parse!(

@@ -2,124 +2,120 @@ use error::*;
 use ast::Exp;
 use engine::*;
 use eval::*;
+use types::*;
 
-pub fn create_ctx(path: &str) -> Context {
+pub fn create_ctx(path: &str) -> Ret<Context> {
 	let mut ctx = Context::new(path.to_string());
-	ctx.add_macro("import", &lib_import);
-	ctx.add_macro("sup", &lib_sup);
-	ctx.add_macro("phf", &lib_phf);
-	ctx.add_macro("gate", &lib_gate);
-	ctx.add_macro("inv", &lib_inv);
-	ctx.add_macro("len", &lib_len);
-	ctx.add_macro("slice", &lib_slice);
-	ctx.add_macro("weighted", &lib_weighted);
-	ctx.add_macro("fourier", &lib_fourier);
-	ctx.add_macro("repeat", &lib_repeat);
-	ctx.add_macro("measure", &lib_measure);
-	ctx
+	ctx.add_macro("import", &lib_import)?;
+	ctx.add_macro("sup", &lib_sup)?;
+	ctx.add_macro("phf", &lib_phf)?;
+	ctx.add_macro("gate", &lib_gate)?;
+	ctx.add_macro("inv", &lib_inv)?;
+	ctx.add_macro("len", &lib_len)?;
+	ctx.add_macro("slice", &lib_slice)?;
+	ctx.add_macro("weighted", &lib_weighted)?;
+	ctx.add_macro("fourier", &lib_fourier)?;
+	ctx.add_macro("repeat", &lib_repeat)?;
+	ctx.add_macro("measure", &lib_measure)?;
+	Ok(ctx)
 }
 
-fn lib_import(exp: &Exp, ctx: &Context) -> RunVal {
+fn lib_import(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 	match eval_exp(exp, ctx) {
 		RunVal::String(ref s) => ctx.import_eval(s.as_str()),
-		_ => panic!("Invalid import path"),
+		_ => err!("Invalid import path"),
 	}
 }
 
-fn lib_sup(exp: &Exp, ctx: &Context) -> RunVal {
-	RunVal::State(match exp {
+fn lib_sup(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
+	Ok(RunVal::State(match exp {
 		&Exp::Tuple(ref args) => create_sup(args.iter().map(|arg| build_state(eval_exp(arg, ctx))).collect()),
 		_ => build_state(eval_exp(exp, ctx)),
-	})
+	}, Type::Any /* TODO infer from arg types */))
 }
 
-fn lib_phf(exp: &Exp, ctx: &Context) -> RunVal {
+fn lib_phf(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 	let val = eval_exp(exp, ctx);
-	build_gate(&val, ctx)
+	Ok(build_gate(&val, ctx)
 		.map(|g| RunVal::Gate(g.negate()))
-		.unwrap_or_else(|| RunVal::State(build_state(val).phase_flip()))
+		.unwrap_or_else(|| RunVal::State(build_state(val).phase_flip(), Type::Any /* TODO same type as input */)))
 }
 
-fn lib_gate(exp: &Exp, ctx: &Context) -> RunVal {
+fn lib_gate(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 	let val = eval_exp(exp, ctx);
-	RunVal::Tuple(build_gate(&val, ctx).unwrap_or_else(|| panic!("Not a gate: {}", val)).into_iter().map(RunVal::State).collect())
+	Ok(RunVal::Tuple(build_gate(&val, ctx).ok_or_else(|| Error(format!("Not a gate: {}", val)))?
+		.into_iter()
+		.map(|s| RunVal::State(s, Type::Any /* TODO depend on function type */))
+		.collect()))
 }
 
-fn lib_inv(exp: &Exp, ctx: &Context) -> RunVal {
+fn lib_inv(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 	let val = eval_exp(exp, ctx);
-	RunVal::Gate(build_gate(&val, ctx).unwrap_or_else(|| panic!("Not a gate: {}", val)).inverse())
+	Ok(RunVal::Gate(build_gate(&val, ctx).ok_or_else(|| Error(format!("Not a gate: {}", val)))?
+		.inverse()))
 }
 
-fn lib_len(exp: &Exp, ctx: &Context) -> RunVal {
+fn lib_len(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 	let val = eval_exp(exp, ctx);
-	RunVal::Index(build_gate(&val, ctx)
+	Ok(RunVal::Index(build_gate(&val, ctx)
 		.map(|g| g.len())
-		.unwrap_or_else(|| build_state(val).len()))
+		.unwrap_or_else(|| build_state(val).len())))
 }
 
-fn lib_slice(exp: &Exp, ctx: &Context) -> RunVal {
+fn lib_slice(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 	fn to_slice_params(val: RunVal) -> Ret<(usize, usize)> {
 		match val {
 			RunVal::Index(n) => Ok((0, n)),
 			RunVal::Tuple(args) => {
 				if let [RunVal::Index(a), RunVal::Index(b)] = args[..] {
 					if a <= b {Ok((a, b))}
-					else {Err(Error(format!("Invalid slice arguments: {} > {}", a, b)))}
+					else {err!("Invalid slice arguments: {} > {}", a, b)}
 				}
-				else {Err(Error(format!("Invalid slice arguments")))}
+				else {err!("Invalid slice arguments")}
 			},
-			_ => Err(Error(format!("Invalid slice: {}", val))),
+			_ => err!("Invalid slice: {}", val),
 		}
 	}
 	match exp {
 		&Exp::Tuple(ref args) if args.len() == 2 => {
 			let state = build_state(eval_exp(&args[0], ctx));
-			let (a, b) = to_slice_params(eval_exp(&args[1], ctx)).unwrap();
-			RunVal::State(state.into_iter().chain(::std::iter::repeat(::num::Zero::zero())).skip(a).take(b - a).collect())
+			let (a, b) = to_slice_params(eval_exp(&args[1], ctx))?;
+			Ok(RunVal::State(state.into_iter().chain(::std::iter::repeat(::num::Zero::zero())).skip(a).take(b - a).collect(), Type::Any))
 		},
-		_ => panic!("Invalid `slice` arguments"),
+		_ => err!("Invalid `slice` arguments"),
 	}
 }
 
-fn lib_weighted(exp: &Exp, ctx: &Context) -> RunVal {
+fn lib_weighted(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 	match exp {
 		&Exp::Tuple(ref args) => {
 			let weights: State = args.iter().map(|arg| {
 				let val = eval_exp(arg, ctx);
-				if let RunVal::Index(n) = val {Cf32::new(n as f32, 0_f32)}
-				else {panic!("Invalid weight: {}", val)}
-			}).collect();
+				if let RunVal::Index(n) = val {Ok(Cf32::new(n as f32, 0_f32))}
+				else {err!("Invalid weight: {}", val)}
+			}).collect::<Ret<_>>()?;
 			let div = weights.iter().fold(Cf32::new(0_f32, 0_f32), |a, b| a + b).sqrt();
-			RunVal::State(weights.into_iter().map(|w| w.sqrt() / div).collect())
+			Ok(RunVal::State(weights.into_iter().map(|w| w.sqrt() / div).collect(), Type::Any))
 		},
-		_ => panic!("Invalid `weighted` arguments"),
+		_ => err!("Invalid `weighted` arguments"),
 	}
 }
 
-fn lib_fourier(exp: &Exp, ctx: &Context) -> RunVal {
-	// let state = build_state(eval_exp(exp, ctx));
-	// let len = state.len();
-	// let w = (2_f32 * ::std::f32::consts::PI * Cf32::i() / len as f32).exp();
-	// let div = (len as f32).sqrt();
-	// RunVal::State((0..len)
-	// 	.map(|i| state.iter().enumerate()
-	// 		.map(|(j, s)| s * w.powc(Cf32::new((i * j) as f32, 0_f32)))
-	// 		.fold(Cf32::new(0_f32, 0_f32), |a, b| a + b) / div)
-	// 	.collect())
+fn lib_fourier(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 	match eval_exp(exp, ctx) {
 		RunVal::Index(n) if n > 0 => {
 			let w = (2_f32 * ::std::f32::consts::PI * Cf32::i() / n as f32).exp();
-			RunVal::Gate((0..n)
+			Ok(RunVal::Gate((0..n)
 				.map(|i| (0..n)
 					.map(|j| w.powc(Cf32::new((i * j) as f32, 0_f32)))
 					.collect())
-				.collect())
+				.collect()))
 		},
-		val => panic!("Invalid size argument: {}", val),
+		val => err!("Invalid size argument: {}", val),
 	}
 }
 
-fn lib_repeat(exp: &Exp, ctx: &Context) -> RunVal {
+fn lib_repeat(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 	fn do_repeat(state: State, n: usize) -> State {
 		let div = (n as f32).sqrt();
 		(0..n).flat_map(|_| state.iter().map(|s| s / div)).collect()
@@ -131,19 +127,20 @@ fn lib_repeat(exp: &Exp, ctx: &Context) -> RunVal {
 				RunVal::Index(n) => {
 					if let Some(gate) = build_gate(&val, ctx) {
 						let wide = gate.into_iter().map(|v| do_repeat(v, n)).collect();
-						RunVal::Gate(::std::iter::repeat(wide).take(n).flat_map(|g: Gate| g).collect())
+						Ok(RunVal::Gate(::std::iter::repeat(wide).take(n).flat_map(|g: Gate| g).collect()))
 					}
 					else {
-						RunVal::State(do_repeat(build_state(val), n))
+						Ok(RunVal::State(do_repeat(build_state(val), n), Type::Any))
 					}
 				},
-				_ => panic!("Invalid `repeat` count"),
+				_ => err!("Invalid `repeat` count"),
 			}
 		},
-		_ => panic!("Invalid `repeat` arguments"),
+		_ => err!("Invalid `repeat` arguments"),
 	}
 }
 
-fn lib_measure(exp: &Exp, ctx: &Context) -> RunVal {
-	RunVal::Index(build_state(eval_exp(exp, ctx)).measure())
+fn lib_measure(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
+	let (s, t) = build_state_typed(eval_exp(exp, ctx))?;
+	t.assign(RunVal::Index(s.measure()))
 }

@@ -17,9 +17,9 @@ pub enum Pat {
 // Scope declaration (statement)
 #[derive(Clone,Debug,PartialEq)]
 pub enum Decl {
-	Data(Ident, Vec<Ident>),
-	// Type(Ident, Type),
 	Let(Pat, Exp),
+	Type(Ident, Pat),
+	Data(Ident, Vec<Ident>),
 	Assert(Exp, Exp),
 	Print(Exp),
 	// Func(Pat, Exp),

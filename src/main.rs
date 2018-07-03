@@ -34,7 +34,7 @@ fn main() {
 	
 	let mut ctx = stdlib::create_ctx(env::current_dir()
 		.expect("Could not find working directory")
-		.to_str().unwrap());
+		.to_str().unwrap()).unwrap();
 	
 	if let Some(matches) = matches.subcommand_matches("eval") {
 		let do_eval = |module: &eval::Module| {
@@ -45,7 +45,7 @@ fn main() {
 					.expect("Could not write output file");
 			}
 		};
-		let mut module = ctx.import(matches.value_of("filename").unwrap());
+		let mut module = ctx.import(matches.value_of("filename").unwrap()).unwrap();
 		do_eval(&module);
 		
 		if matches.is_present("watch") {
@@ -56,7 +56,7 @@ fn main() {
 			loop {
 				match rx.recv() {
 					Ok(DebouncedEvent::Write(_)) => {
-						let new_module = ctx.import(module.path.as_str());
+						let new_module = ctx.import(module.path.as_str()).unwrap();
 						if module.exp != new_module.exp {
 							println!("--");
 							module = new_module;

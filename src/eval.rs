@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::collections::HashMap;
 
 #[derive(Clone)]
-pub struct Macro(pub Ident, pub Rc<Fn(&Exp, &Context) -> RunVal>);
+pub struct Macro(pub Ident, pub Rc<Fn(&Exp, &Context) -> Ret<RunVal>>);
 
 impl fmt::Debug for Macro {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -33,7 +33,7 @@ pub enum RunVal {
 	Tuple(Vec<RunVal>),
 	Func(Rc<Context>, Pat, Exp),
 	Macro(Macro),
-	State(State),
+	State(State, Type),
 	Gate(Gate),
 }
 
@@ -46,7 +46,9 @@ impl fmt::Display for RunVal {
 			&RunVal::Tuple(ref vals) => write!(f, "({})", vals.iter().map(|val| format!("{}", val)).collect::<Vec<_>>().join(", ")),
 			&RunVal::Func(ref _ctx, ref _pat, ref _body) => write!(f, "(..) -> (..)"),
 			&RunVal::Macro(ref mc) => write!(f, "{:?}", mc),
-			&RunVal::State(ref state) => write!(f, "{}", StateView(state)),
+			&RunVal::State(ref state, ref ty) => if ty != &Type::Any {
+				write!(f, "{}: {}", StateView(state), ty)
+			} else {write!(f, "{}", StateView(state))},
 			&RunVal::Gate(ref gate) => write!(f, "[{}]", gate.iter().map(|state| format!("{}", StateView(state))).collect::<Vec<_>>().join(", ")),
 		}
 	}
@@ -80,31 +82,33 @@ impl Context {
 		find("Variable", id, self.vars.get(id))
 	}
 	
-	pub fn add_var(&mut self, id: Ident, val: RunVal) {
+	pub fn add_var(&mut self, id: Ident, val: RunVal) -> Ret {
 		self.vars.insert(id, val);
+		Ok(())
 	}
 	
 	pub fn find_type(&self, id: &Ident) -> Ret<Type> {
 		find("Type", id, self.types.get(id))
 	}
 	
-	pub fn add_type(&mut self, id: Ident, ty: Type) {
+	pub fn add_type(&mut self, id: Ident, ty: Type) -> Ret {
 		self.types.insert(id, ty);
+		Ok(())
 	}
 	
-	pub fn add_datatype(&mut self, id: String, variants: Vec<Ident>) {
+	pub fn add_datatype(&mut self, id: String, variants: Vec<Ident>) -> Ret {
 		let rc = Rc::new(DataType {id: id.clone(), variants: variants.clone()});
 		for (i, variant) in variants.iter().enumerate() {
-			self.add_var(variant.clone(), RunVal::Data(rc.clone(), i));
+			self.add_var(variant.clone(), RunVal::Data(rc.clone(), i))?;
 		}
-		self.add_type(id, Type::Data(rc));
+		self.add_type(id, Type::Data(rc))
 	}
 	
-	pub fn add_macro(&mut self, id: &str, handle: &'static Fn(&Exp, &Context) -> RunVal) {
+	pub fn add_macro(&mut self, id: &str, handle: &'static Fn(&Exp, &Context) -> Ret<RunVal>) -> Ret {
 		self.add_var(id.to_string(), RunVal::Macro(Macro(id.to_string(), Rc::new(handle))))
 	}
 	
-	pub fn import(&self, path: &str) -> Module {
+	pub fn import(&self, path: &str) -> Ret<Module> {
 		use std::path::Path;
 		use resource;
 		use stdlib;
@@ -113,15 +117,15 @@ impl Context {
 		let import_path = Path::new(&self.path()).join(&resource::with_ext(path, "fqy"));
 		let mut import_dir = import_path.clone();
 		import_dir.pop();
-		let ctx = stdlib::create_ctx(import_dir.to_str().unwrap());
+		let ctx = stdlib::create_ctx(&import_dir.to_string_lossy())?;
 		let file = format!("{}", import_path.to_string_lossy());
-		let exp = parser::parse_resource(&file).expect("Failed to parse imported script");
-		Module {path: file, exp: exp, ctx: ctx}
+		let exp = parser::parse_resource(&file)?;
+		Ok(Module {path: file, exp: exp, ctx: ctx})
 	}
 	
-	pub fn import_eval(&self, path: &str) -> RunVal {
-		let mut module = self.import(path);
-		eval_exp_inline(&module.exp, &mut module.ctx)
+	pub fn import_eval(&self, path: &str) -> Ret<RunVal> {
+		let mut module = self.import(path)?;
+		Ok(eval_exp_inline(&module.exp, &mut module.ctx))
 	}
 }
 
@@ -144,7 +148,7 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 		&Exp::Scope(ref decls, ref ret) => {
 			let mut child = ctx.create_child();
 			for decl in decls {
-				eval_decl(decl, &mut child);
+				eval_decl(decl, &mut child).unwrap();
 			}
 			eval_exp(ret, &child)
 		},
@@ -152,7 +156,8 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 		&Exp::Tuple(ref args) => RunVal::Tuple(eval_exp_seq(args, ctx)),
 		&Exp::Concat(ref args) => RunVal::State(args.iter()
 			.flat_map(|e| build_state(eval_exp(e, ctx)))
-			.collect::<State>().normalized()), // TODO gates
+			.collect::<State>().normalized(), // TODO gates
+			Type::Any),
 		&Exp::Cond(ref cond_exp, ref then_exp, ref else_exp) => {
 			let val = eval_exp(cond_exp, ctx);
 			if let Some(b) = build_bool(&val) {
@@ -161,12 +166,12 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 			else {
 				let state = build_state(val);
 				if state.len() > 2 {
-					panic!("Conditional state canot be {}-dimensional", state.len())
+					panic!("Conditional state cannot be {}-dimensional", state.len())
 				}
 				RunVal::State(state.extract(vec![
 					build_state(eval_exp(else_exp, ctx)),
 					build_state(eval_exp(then_exp, ctx)),
-				]))
+				]), Type::Any /* TODO sum of then/else types */)
 			}
 		},
 		&Exp::Lambda(ref pat, ref body) => {
@@ -181,27 +186,27 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 					assign_pat(&pat, &eval_exp(arg, ctx), &mut fn_ctx).unwrap();
 					eval_exp(&body, &fn_ctx)
 				},
-				RunVal::Macro(Macro(_, handle)) => handle(arg, ctx),
-				RunVal::Gate(gate) => RunVal::State(build_state(eval_exp(arg, ctx)).extract(gate)),
+				RunVal::Macro(Macro(_, handle)) => handle(arg, ctx).unwrap(),
+				RunVal::Gate(gate) => RunVal::State(build_state(eval_exp(arg, ctx)).extract(gate), Type::Any /* TODO maintain arg type */),
 				val => {
-					let msg = &format!("Cannot invoke {}", val)[..];
+					let msg = &format!("Cannot invoke {}", val);
 					let state = build_state(eval_exp(arg, ctx));
 					let gate = build_gate(&val, ctx).expect(msg);
-					RunVal::State(state.extract(gate))
+					RunVal::State(state.extract(gate), Type::Any /* TODO maintain arg type */)
 				},
 			}
 		},
-		&Exp::State(ref arg) => RunVal::State(build_state(eval_exp(arg, ctx))),
+		&Exp::State(ref arg) => RunVal::State(build_state(eval_exp(arg, ctx)), Type::Any /* TODO maintain arg type */),
 		&Exp::Phase(phase, ref arg) => {
 			let val = eval_exp(arg, ctx);
 			build_gate(&val, ctx)
 				.map(|g| RunVal::Gate(g.power(phase)))
-				.unwrap_or_else(|| RunVal::State(build_state(val).phase(phase)))
+				.unwrap_or_else(|| RunVal::State(build_state(val).phase(phase), Type::Any /* TODO maintain val type */))
 		},
 		&Exp::Extract(ref arg, ref cases) => {
 			let state = build_state(eval_exp(arg, ctx));
 			let gate = create_extract_gate(cases, ctx);
-			RunVal::State(state.extract(gate))
+			RunVal::State(state.extract(gate), Type::Any /* TODO maintain gate type */)
 		},
 		&Exp::Anno(ref exp, ref anno) => eval_type(anno, ctx).unwrap().assign(eval_exp(exp, ctx)).unwrap(),
 	}
@@ -211,11 +216,11 @@ pub fn eval_exp_inline(exp: &Exp, ctx: &mut Context) -> RunVal {
 	match exp {
 		Exp::Scope(ref decls, ref exp) => {
 			for decl in decls {
-				eval_decl(decl, ctx);
+				eval_decl(decl, ctx).unwrap();
 			}
 			eval_exp(exp, ctx)
 		},
-		_ => eval_exp(&exp, ctx),
+		_ => eval_exp(exp, ctx),
 	}
 }
 
@@ -243,27 +248,30 @@ pub fn eval_type(pat: &Pat, ctx: &Context) -> Ret<Type> {
 	}
 }
 
-pub fn eval_decl(decl: &Decl, ctx: &mut Context) {
+pub fn eval_decl(decl: &Decl, ctx: &mut Context) -> Ret {
 	match decl {
+		&Decl::Let(ref pat, ref exp) => assign_pat(pat, &eval_exp(exp, ctx), ctx),
+		&Decl::Type(ref id, ref pat) => {
+			let ty = eval_type(pat, ctx)?;
+			ctx.add_type(id.clone(), ty)
+		},
 		&Decl::Data(ref id, ref variants) => ctx.add_datatype(id.clone(), variants.clone()),
-		&Decl::Let(ref pat, ref exp) => assign_pat(pat, &eval_exp(exp, ctx), ctx).unwrap(),
 		&Decl::Assert(ref expect, ref result) => {
 			let a = eval_exp(expect, ctx);
 			let b = eval_exp(result, ctx);
-			if a != b {
-				panic!("Assertion failed: {} != {}", a, b);
-			}
+			if a != b {err!("Assertion failed: {} != {}", a, b)}
+			else {Ok(())}
 		},
-		&Decl::Print(ref exp) => println!(":: {}", eval_exp(exp, ctx)),
+		&Decl::Print(ref exp) => Ok(println!(":: {}", eval_exp(exp, ctx))),
 	}
 }
 
 pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Ret {
 	match (pat, val) {
 		(&Pat::Any, _) => Ok(()),
-		(&Pat::Var(ref id), _) => {ctx.add_var(id.clone(), val.clone()); Ok(())},
+		(&Pat::Var(ref id), _) => ctx.add_var(id.clone(), val.clone()),
 		(&Pat::Tuple(ref pats), &RunVal::Tuple(ref vals)) => {
-			if pats.len() != vals.len() {Err(Error(format!("Cannot deconstruct {} values from value: {}", pats.len(), val)))}
+			if pats.len() != vals.len() {err!("Cannot deconstruct {} values from value: {}", pats.len(), val)}
 			else {
 				pats.iter().zip(vals)
 					.map(|(pat, val)| assign_pat(pat, val, ctx))
@@ -271,7 +279,7 @@ pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Ret {
 			}
 		},
 		(&Pat::Anno(ref pat, ref anno), val) => assign_pat(pat, &eval_type(&**anno, ctx)?.assign(val.clone())?, ctx),
-		_ => Err(Error(format!("{:?} cannot deconstruct `{}`", pat, val))),
+		_ => err!("{:?} cannot deconstruct `{}`", pat, val),
 	}
 }
 
@@ -284,15 +292,16 @@ pub fn build_bool(val: &RunVal) -> Option<bool> {
 }
 
 pub fn build_state(val: RunVal) -> State {
+	build_state_typed(val).unwrap().0
+}
+
+pub fn build_state_typed(val: RunVal) -> Ret<(State, Type)> {
 	match val {
-		RunVal::Index(n) => get_state(n),
-		RunVal::String(_) => unimplemented!(),
-		RunVal::Data(dt, index) => get_state(index).pad(dt.variants.len()),
-		RunVal::Tuple(vals) => vals.into_iter().fold(get_state(0), |a, b| a.combine(build_state(b))),
-		RunVal::Func(_ctx, _pat, _body) => unimplemented!(),
-		RunVal::Macro(_mc) => unimplemented!(),
-		RunVal::State(state) => state,
-		RunVal::Gate(_gate) => unimplemented!(),
+		RunVal::Index(n) => Ok((get_state(n), Type::Any)),
+		RunVal::Data(dt, index) => Ok((get_state(index).pad(dt.variants.len()), Type::Data(dt))),
+		RunVal::Tuple(vals) => Ok((vals.into_iter().fold(get_state(0), |a, b| a.combine(build_state(b))), Type::Any /* TODO type from vals */)),
+		RunVal::State(state, ty) => Ok((state, ty)),
+		val => err!("Cannot build state from {}", val)
 	}
 }
 

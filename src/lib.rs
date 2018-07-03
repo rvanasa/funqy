@@ -10,6 +10,7 @@ extern crate ndarray;
 extern crate ndarray_linalg;
 // extern crate openblas_src;
 
+#[macro_use]
 pub mod error;
 pub mod resource;
 pub mod ast;

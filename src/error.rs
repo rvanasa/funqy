@@ -36,3 +36,7 @@ impl From<reqwest::Error> for Error {
 		Error(format!("{:?}", error))
 	}
 }
+
+macro_rules! err {
+	($($t: expr),*) => (Err(Error(format!($($t),*))))
+}

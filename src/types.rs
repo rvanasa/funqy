@@ -18,6 +18,16 @@ pub enum Type {
 	Tuple(Vec<Type>),
 }
 
+impl fmt::Display for Type {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			&Type::Any => write!(f, "_"),
+			&Type::Data(ref rc) => write!(f, "{}", (*rc).id),
+			&Type::Tuple(ref args) => write!(f, "({})", args.iter().map(|val| format!("{}", val)).collect::<Vec<_>>().join(", ")),
+		}
+	}
+}
+
 impl Type {
 	pub fn describes(&self, val: &RunVal) -> bool {
 		self.assign(val.clone()).is_ok()
@@ -26,27 +36,42 @@ impl Type {
 	pub fn assign(&self, val: RunVal) -> Ret<RunVal> {
 		match (self, val) {
 			(Type::Any, val) => Ok(val),
-			(Type::Data(ref dt), RunVal::Index(n)) => Ok(RunVal::Data(dt.clone(), n)),
-			(Type::Tuple(ref params), RunVal::Tuple(ref args)) => {
-				if params.len() != args.len() {
-					Err(Error(format!("{} is not of length {}", RunVal::Tuple(args.to_vec()), params.len())))
+			(Type::Tuple(ref types), RunVal::Tuple(ref args)) => {
+				if types.len() != args.len() {
+					err!("{} is not of length {}", RunVal::Tuple(args.to_vec()), types.len())
 				}
 				else {
 					// TODO remove clone()
-					params.iter().zip(args).map(|(p, a)| p.assign(a.clone())).collect::<Ret<_>>().map(RunVal::Tuple)
+					types.iter().zip(args).map(|(p, a)| p.assign(a.clone())).collect::<Ret<_>>().map(RunVal::Tuple)
 				}
-			}
-			(t, val) => Err(Error(format!("{} is not of type {}", val, t))),
+			},
+			(_, RunVal::Index(n)) => self.from_index(n),
+			(_, RunVal::Data(_, n)) => self.from_index(n),
+			(_, RunVal::State(state, _)) => {
+				if self.size().map(|s| s != state.len()).unwrap_or(false) {
+					err!("A state of size {} is not of type {}", state.len(), self)
+				}
+				else {Ok(RunVal::State(state, self.clone()))}
+			},
+			(_, val) => err!("{} is not of type {}", val, self)
 		}
 	}
-}
-
-impl fmt::Display for Type {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+	
+	pub fn size(&self) -> Option<usize> {
 		match self {
-			&Type::Any => write!(f, "_"),
-			&Type::Data(ref rc) => write!(f, "{}", (*rc).id),
-			&Type::Tuple(ref args) => write!(f, "({})", args.iter().map(|val| format!("{}", val)).collect::<Vec<_>>().join(", ")),
+			Type::Any => None,
+			Type::Data(ref dt) => Some((*dt.clone()).variants.len()),
+			Type::Tuple(ref types) => types.iter().map(Type::size).fold(Some(1), |a, b| a.and_then(|a| b.map(|b| a * b))),
+		}
+	}
+	
+	pub fn from_index(&self, n: usize) -> Ret<RunVal> {
+		match self {
+			Type::Any => Ok(RunVal::Index(n)),
+			Type::Data(ref dt) => Ok(RunVal::Data(dt.clone(), n)),
+			Type::Tuple(ref _types) => {
+				unimplemented!()
+			},
 		}
 	}
 }

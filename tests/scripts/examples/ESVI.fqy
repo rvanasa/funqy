@@ -11,6 +11,6 @@ data Location =
 	| Atmora
 	| Alinor
 
-let chances = weighted(1, 4, 2, 4, 4, 2, 0, 1)
+let chances: Location = weighted(1, 4, 2, 4, 4, 2, 0, 1)
 
-measure(chances) : Location
+measure(chances)

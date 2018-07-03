@@ -1,0 +1,15 @@
+data Bool = F | T
+
+type Reg3 = (Bool, Bool, Bool)
+
+fn tangle_qb_reg((a, b, c): Reg3): Reg3 = {
+	if a
+		then if b
+			then if c
+				then (sup(F, T), F, c)
+				else (phf(F), phf(F), phf(F))
+			else (a, F, c)
+		else (F, b, a)
+}
+
+tangle_qb_reg(@[1/2] F, sup(F, T), T)
