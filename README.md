@@ -13,7 +13,7 @@ This tends to be vastly more intuitive and scalable than the prevalent [circuit-
 ### Build Requirements
 
 - [Nightly Rust](https://doc.rust-lang.org/1.15.1/book/nightly-rust.html) `>= 1.28.0`
-- [OpenBLAS](https://github.com/xianyi/OpenBLAS/wiki/Installation-Guide) `>= 0.2.20`
+- [gfortran](http://laptops.eng.uci.edu/software-installation/getting-started-with-programming/fortran-tutorial?tmpl=%2Fsystem%2Fapp%2Ftemplates%2Fprint%2F&showPrintDialog=1) `>= 4.8`
 
 ### Usage Examples
 

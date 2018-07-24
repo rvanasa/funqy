@@ -3,11 +3,12 @@ data Bool = F | T
 let (^) = sup
 let (~) = phf
 
-let _Test = import("_Test")
-let Prop = import("examples/Prop")
-let Random = import("examples/Random")
-let Fourier = import("examples/Fourier")
-let ESVI = import("examples/ESVI")
+do import("_Test")
+do import("examples/Prop")
+do import("examples/Random")
+do import("examples/Fourier")
+do import("examples/ESVI")
+do import("examples/TangleTree")
 
 let f = if 0
 	then extract {
@@ -19,4 +20,4 @@ let f = if 0
 		(T, F) => (~F, ~T),
 	}
 
-import("examples/TangleTree")
+import("examples/Concat")

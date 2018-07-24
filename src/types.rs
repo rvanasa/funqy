@@ -16,6 +16,7 @@ pub enum Type {
 	Any,
 	Data(Rc<DataType>),
 	Tuple(Vec<Type>),
+	Concat(Vec<Type>),
 }
 
 impl fmt::Display for Type {
@@ -24,6 +25,7 @@ impl fmt::Display for Type {
 			&Type::Any => write!(f, "_"),
 			&Type::Data(ref rc) => write!(f, "{}", (*rc).id),
 			&Type::Tuple(ref args) => write!(f, "({})", args.iter().map(|val| format!("{}", val)).collect::<Vec<_>>().join(", ")),
+			&Type::Concat(ref args) => write!(f, "[{}]", args.iter().map(|val| format!("{}", val)).collect::<Vec<_>>().join(", ")),
 		}
 	}
 }
@@ -45,6 +47,7 @@ impl Type {
 					types.iter().zip(args).map(|(p, a)| p.assign(a.clone())).collect::<Ret<_>>().map(RunVal::Tuple)
 				}
 			},
+			// TODO concat assignments?
 			(_, RunVal::Index(n)) => self.from_index(n),
 			(_, RunVal::Data(_, n)) => self.from_index(n),
 			(_, RunVal::State(state, _)) => {
@@ -62,6 +65,7 @@ impl Type {
 			Type::Any => None,
 			Type::Data(ref dt) => Some((*dt.clone()).variants.len()),
 			Type::Tuple(ref types) => types.iter().map(Type::size).fold(Some(1), |a, b| a.and_then(|a| b.map(|b| a * b))),
+			Type::Concat(ref types) => types.iter().map(Type::size).fold(Some(1), |a, b| a.and_then(|a| b.map(|b| a + b))),
 		}
 	}
 	
@@ -70,6 +74,9 @@ impl Type {
 			Type::Any => Ok(RunVal::Index(n)),
 			Type::Data(ref dt) => Ok(RunVal::Data(dt.clone(), n)),
 			Type::Tuple(ref _types) => {
+				unimplemented!()
+			},
+			Type::Concat(ref _types) => {
 				unimplemented!()
 			},
 		}

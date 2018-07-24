@@ -310,8 +310,14 @@ named!(print_decl<Decl>, do_parse!(
 	(Decl::Print(exp))
 ));
 
+named!(do_decl<Decl>, do_parse!(
+	ws!(tag!("do")) >>
+	exp: exp >>
+	(Decl::Do(exp))
+));
+
 named!(decl<Decl>,
-	alt!(let_decl | fn_decl | data_decl | type_decl | assert_decl | print_decl)
+	alt!(let_decl | fn_decl | data_decl | type_decl | assert_decl | print_decl | do_decl)
 );
 
 named!(wildcard_pat<Pat>, do_parse!(
@@ -333,8 +339,17 @@ named!(tuple_pat<Pat>, map!(
 	|vec| if vec.len() == 1 {vec[0].clone()} else {Pat::Tuple(vec)}
 ));
 
+named!(concat_pat<Pat>, map!(
+	delimited!(
+		ws!(tag!("[")),
+		separated_list!(ws!(tag!(",")), pat),
+		ws!(tag!("]"))
+	),
+	Pat::Concat
+));
+
 named!(pat<Pat>, do_parse!(
-	pat: alt!(var_pat | wildcard_pat | tuple_pat) >>
+	pat: alt!(var_pat | wildcard_pat | tuple_pat | concat_pat) >>
 	anno: opt_anno >>
 	(if let Some(anno) = anno {Pat::Anno(Rc::new(pat), Rc::new(anno))} else {pat})
 ));

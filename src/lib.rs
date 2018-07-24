@@ -8,7 +8,6 @@ extern crate num;
 extern crate nom;
 extern crate ndarray;
 extern crate ndarray_linalg;
-// extern crate openblas_src;
 
 #[macro_use]
 pub mod error;

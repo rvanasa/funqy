@@ -10,6 +10,7 @@ pub enum Pat {
 	Any,
 	Var(Ident),
 	Tuple(Vec<Pat>),
+	Concat(Vec<Pat>),
 	// Data(Ident, Rc<Pat>),
 	Anno(Rc<Pat>, Rc<Pat>),
 }
@@ -22,6 +23,7 @@ pub enum Decl {
 	Data(Ident, Vec<Ident>),
 	Assert(Exp, Exp),
 	Print(Exp),
+	Do(Exp),
 }
 
 // Expression

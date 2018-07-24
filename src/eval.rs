@@ -114,13 +114,17 @@ impl Context {
 		use stdlib;
 		use parser;
 		
-		let import_path = Path::new(&self.path()).join(&resource::with_ext(path, "fqy"));
-		let mut import_dir = import_path.clone();
-		import_dir.pop();
-		let ctx = stdlib::create_ctx(&import_dir.to_string_lossy())?;
-		let file = format!("{}", import_path.to_string_lossy());
+		let (ctx, file) = if path.starts_with("raw:") {(self.clone(), path.to_string())}
+		else {
+			let import_path = Path::new(&self.path()).join(&resource::with_ext(path, "fqy"));
+			let mut import_dir = import_path.clone();
+			import_dir.pop();
+			let file = import_path.to_string_lossy().to_string();
+			let ctx = stdlib::create_ctx(&import_dir.to_string_lossy())?;
+			(ctx, file)
+		};
 		let exp = parser::parse_resource(&file)?;
-		Ok(Module {path: file, exp: exp, ctx: ctx})
+		Ok(Module {path: file.to_string(), exp: exp, ctx: ctx})
 	}
 	
 	pub fn import_eval(&self, path: &str) -> Ret<RunVal> {
@@ -244,6 +248,10 @@ pub fn eval_type(pat: &Pat, ctx: &Context) -> Ret<Type> {
 			.map(|p| eval_type(p, ctx))
 			.collect::<Ret<_>>()
 			.map(Type::Tuple),
+		&Pat::Concat(ref args) => args.iter()
+			.map(|p| eval_type(p, ctx))
+			.collect::<Ret<_>>()
+			.map(Type::Concat),
 		&Pat::Anno(_, _) => Err(Error(format!("Annotations not allowed in types"))),
 	}
 }
@@ -263,6 +271,10 @@ pub fn eval_decl(decl: &Decl, ctx: &mut Context) -> Ret {
 			else {Ok(())}
 		},
 		&Decl::Print(ref exp) => Ok(println!(":: {}", eval_exp(exp, ctx))),
+		&Decl::Do(ref exp) => {
+			eval_exp(exp, ctx);
+			Ok(())
+		},
 	}
 }
 
@@ -277,6 +289,9 @@ pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Ret {
 					.map(|(pat, val)| assign_pat(pat, val, ctx))
 					.collect::<Ret<_>>()
 			}
+		},
+		(&Pat::Concat(ref _pats), &RunVal::State(ref _state, _)) => {
+			unimplemented!()
 		},
 		(&Pat::Anno(ref pat, ref anno), val) => assign_pat(pat, &eval_type(&**anno, ctx)?.assign(val.clone())?, ctx),
 		_ => err!("{:?} cannot deconstruct `{}`", pat, val),

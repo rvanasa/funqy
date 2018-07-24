@@ -1,7 +1,7 @@
 [package]
 name = "funqy"
 version = "0.1.0"
-authors = ["Ryan Vandersmith <ryanvandersmith@gmail.com>"]
+authors = ["Ryan Vandersmith (https://github.com/rvanasa)"]
 
 [dependencies]
 rand = "^0.4.2"
@@ -9,7 +9,6 @@ regex = "1.0"
 reqwest = "0.8"
 num = "^0.1"
 ndarray = "0.11"
-# ndarray-linalg = "0.9"
 ndarray-linalg = { version = "0.9", features = ["openblas"] }
 nom = "3.2.1"
 clap = "^2.31"
