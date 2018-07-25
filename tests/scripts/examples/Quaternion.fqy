@@ -1,17 +1,22 @@
+let (^) = sup
+let (~) = phf
+let (#) = measure
+
+// Unit biquaternion state implementation (collapses on measurement)
+
 data Quat = H | I | J | K
 
-fn hmul = {
+fn (*) = {
     (H, H) => H,
     (I, I) | (J, J) | (K, K) => ~H,
-    (H, I) => I,
-    (H, J) => J,
-    (H, K) => K,
-    (I, J) => K,
-    (J, K) => I,
-    (K, I) => J,
+    (H, I) | (J, K) => I,
+    (H, J) | (K, I) => J,
+    (H, K) | (I, J) => K,
     (J, I) => ~K,
     (K, J) => ~I,
     (I, K) => ~J,
 }
 
-print hmul(@[1/2]J, @[1/2]K)
+print sup(I, J, K) * sup(~I, J, ~K)
+
+print measure(@[1/2]J * @[1/2]K): Quat
