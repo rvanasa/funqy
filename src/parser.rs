@@ -82,13 +82,26 @@ named!(var_exp<Exp>, map!(
 	Exp::Var
 ));
 
-named!(tuple_exp<Exp>, map!(
-	delimited!(
-		ws!(tag!("(")),
-		separated_list!(ws!(tag!(",")), arg_exp),
-		ws!(tag!(")"))
+named!(tuple_exp<Exp>, alt!(
+	repeat_exp |
+	map!(
+		delimited!(
+			ws!(tag!("(")),
+			separated_list!(ws!(tag!(",")), arg_exp),
+			ws!(tag!(")"))
+		),
+		|vec| if vec.len() == 1 && match vec[..] {[Exp::Tuple(_)] => false, _ => true} {vec[0].clone()} else {Exp::Tuple(vec)}
+	)
+));
+
+named!(repeat_exp<Exp>, delimited!(
+	ws!(tag!("(")),
+	do_parse!(
+		n: index_literal >>
+		exp: target_exp >>
+		(Exp::Repeat(n, Rc::new(exp)))
 	),
-	|vec| if vec.len() == 1 && match vec[..] {[Exp::Tuple(_)] => false, _ => true} {vec[0].clone()} else {Exp::Tuple(vec)}
+	ws!(tag!(")"))
 ));
 
 named!(concat_exp<Exp>, map!(
@@ -224,18 +237,8 @@ named!(prefix_opr_exp<Exp>, do_parse!(
 	(Exp::Invoke(Rc::new(Exp::Var(opr)), Rc::new(exp)))
 ));
 
-named!(repeat_exp<Exp>, delimited!(
-	ws!(tag!("(")),
-	do_parse!(
-		n: index_literal >>
-		exp: target_exp >>
-		(Exp::Repeat(n, Rc::new(exp)))
-	),
-	ws!(tag!(")"))
-));
-
 named!(target_exp<Exp>,
-	alt!(phase_exp | prefix_opr_exp | cond_exp | anno_exp | lambda_exp | repeat_exp)
+	alt!(phase_exp | prefix_opr_exp | cond_exp | anno_exp | lambda_exp)
 );
 
 named!(exp<Exp>, do_parse!(
@@ -340,22 +343,16 @@ named!(var_pat<Pat>, map!(
 	Pat::Var
 ));
 
-named!(tuple_pat<Pat>, map!(
-	delimited!(
-		ws!(tag!("(")),
-		separated_list!(ws!(tag!(",")), pat),
-		ws!(tag!(")"))
-	),
-	|vec| if vec.len() == 1 {vec[0].clone()} else {Pat::Tuple(vec)}
-));
-
-named!(concat_pat<Pat>, map!(
-	delimited!(
-		ws!(tag!("[")),
-		separated_list!(ws!(tag!(",")), pat),
-		ws!(tag!("]"))
-	),
-	Pat::Concat
+named!(tuple_pat<Pat>, alt!(
+	repeat_pat |
+	map!(
+		delimited!(
+			ws!(tag!("(")),
+			separated_list!(ws!(tag!(",")), pat),
+			ws!(tag!(")"))
+		),
+		|vec| if vec.len() == 1 {vec[0].clone()} else {Pat::Tuple(vec)}
+	)
 ));
 
 named!(repeat_pat<Pat>, delimited!(
@@ -368,8 +365,17 @@ named!(repeat_pat<Pat>, delimited!(
 	ws!(tag!(")"))
 ));
 
+named!(concat_pat<Pat>, map!(
+	delimited!(
+		ws!(tag!("[")),
+		separated_list!(ws!(tag!(",")), pat),
+		ws!(tag!("]"))
+	),
+	Pat::Concat
+));
+
 named!(pat<Pat>, do_parse!(
-	pat: alt!(repeat_pat | var_pat | wildcard_pat | tuple_pat | concat_pat) >>
+	pat: alt!(var_pat | wildcard_pat | tuple_pat | concat_pat) >>
 	anno: opt_anno >>
 	(if let Some(anno) = anno {Pat::Anno(Rc::new(pat), Rc::new(anno))} else {pat})
 ));

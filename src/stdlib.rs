@@ -28,9 +28,9 @@ fn lib_import(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 }
 
 fn lib_sup(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
-	Ok(RunVal::State(match exp {
-		&Exp::Tuple(ref args) => create_sup(args.iter().map(|arg| build_state(eval_exp(arg, ctx))).collect()),
-		_ => build_state(eval_exp(exp, ctx)),
+	Ok(RunVal::State(match eval_exp(exp, ctx) {
+		RunVal::Tuple(args) => create_sup(args.into_iter().map(build_state).collect()),
+		val => build_state(val),
 	}, Type::Any /* TODO infer from arg types */))
 }
 
