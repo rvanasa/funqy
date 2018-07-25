@@ -200,6 +200,10 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 				},
 			}
 		},
+		&Exp::Repeat(n, ref exp) => {
+			let val = eval_exp(&*exp, ctx);
+			RunVal::Tuple((0..n).map(|_| val.clone()).collect())
+		},
 		&Exp::State(ref arg) => RunVal::State(build_state(eval_exp(arg, ctx)), Type::Any /* TODO maintain arg type */),
 		&Exp::Phase(phase, ref arg) => {
 			let val = eval_exp(arg, ctx);
@@ -253,6 +257,10 @@ pub fn eval_type(pat: &Pat, ctx: &Context) -> Ret<Type> {
 			.collect::<Ret<_>>()
 			.map(Type::Concat),
 		&Pat::Anno(_, _) => Err(Error(format!("Annotations not allowed in types"))),
+		&Pat::Repeat(n, ref pat) => {
+			let ty = eval_type(&*pat, ctx);
+			(0..n).map(|_| ty.clone()).collect::<Ret<_>>().map(Type::Tuple)
+		},
 	}
 }
 

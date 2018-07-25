@@ -20,4 +20,6 @@ let f = if 0
 		(T, F) => (~F, ~T),
 	}
 
-import("examples/Concat")
+// import("examples/Concat")
+let a: (2(2Bool)) = ((2T),(2F))
+a

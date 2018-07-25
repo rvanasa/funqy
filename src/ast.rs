@@ -13,6 +13,7 @@ pub enum Pat {
 	Concat(Vec<Pat>),
 	// Data(Ident, Rc<Pat>),
 	Anno(Rc<Pat>, Rc<Pat>),
+	Repeat(usize, Rc<Pat>),
 }
 
 // Scope declaration (statement)
@@ -40,6 +41,7 @@ pub enum Exp {
 	Cond(ExpRc, ExpRc, ExpRc),
 	Lambda(Pat, ExpRc),
 	Invoke(ExpRc, ExpRc),
+	Repeat(usize, ExpRc),
 	State(ExpRc),
 	Phase(Phase, ExpRc),
 	Extract(ExpRc, Vec<Case>),

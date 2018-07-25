@@ -224,8 +224,18 @@ named!(prefix_opr_exp<Exp>, do_parse!(
 	(Exp::Invoke(Rc::new(Exp::Var(opr)), Rc::new(exp)))
 ));
 
+named!(repeat_exp<Exp>, delimited!(
+	ws!(tag!("(")),
+	do_parse!(
+		n: index_literal >>
+		exp: target_exp >>
+		(Exp::Repeat(n, Rc::new(exp)))
+	),
+	ws!(tag!(")"))
+));
+
 named!(target_exp<Exp>,
-	alt!(phase_exp | prefix_opr_exp | cond_exp | anno_exp | lambda_exp)
+	alt!(phase_exp | prefix_opr_exp | cond_exp | anno_exp | lambda_exp | repeat_exp)
 );
 
 named!(exp<Exp>, do_parse!(
@@ -348,8 +358,18 @@ named!(concat_pat<Pat>, map!(
 	Pat::Concat
 ));
 
+named!(repeat_pat<Pat>, delimited!(
+	ws!(tag!("(")),
+	do_parse!(
+		n: index_literal >>
+		pat: pat >>
+		(Pat::Repeat(n, Rc::new(pat)))
+	),
+	ws!(tag!(")"))
+));
+
 named!(pat<Pat>, do_parse!(
-	pat: alt!(var_pat | wildcard_pat | tuple_pat | concat_pat) >>
+	pat: alt!(repeat_pat | var_pat | wildcard_pat | tuple_pat | concat_pat) >>
 	anno: opt_anno >>
 	(if let Some(anno) = anno {Pat::Anno(Rc::new(pat), Rc::new(anno))} else {pat})
 ));
