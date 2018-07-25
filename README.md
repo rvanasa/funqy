@@ -10,13 +10,17 @@ This abstraction provides a clear understanding of the logic and quantum perform
 of executing one path at a time, pattern extraction can execute arbitrary combinations of possible inputs. 
 This tends to be vastly more intuitive and scalable than the prevalent [circuit-based algorithm](https://arxiv.org/abs/1804.03719) conventions. 
 
+---
+
 Here are a few interesting outcomes of this paradigm:
-- Funqy looks and feels like a high-level programming language, oriented for **classical developers** unfamiliar with quantum gates and registers.
+- Funqy looks and feels like a high-level programming language, **useful for classical developers** unfamiliar with quantum gates and registers.
+- All functions and values are immutable and thus **purely functional**. This declarative basis for quantum computation is more intuitive, more optimizable, and more powerful than the quantum circuit paradigm. 
 - The language is **architecture-agnostic**; qubits and gates are completely invisible to the language unless otherwise desired.
-- By organizing code in terms of functions and extractions, scripts tend to **clearly convey** their underlying purpose and logic. 
-- On top of "multiplicative" space (entanglement/tuples), FunQy unlocks the "additive" space (matrix rows/columns) of a quantum system.
-- It is possible to define **non-unitary** (i.e. non-square and/or non-reversible matrix) mappings, which compile using auxillary qubits as needed.
-- Initial state definitions, repeated measurements, and dynamically adjusted circuits are all **one-liners** using FunQy.
+- **Classical and quantum algorithms are defined simulaneously**; in other words, the compiler will use the classical version of a function if the input value is correspondingly classical. In effect, only operations which would actually benefit from quantum speed-up are performed on a quantum register. 
+- By organizing code in terms of functions and extractions, scripts tend to **semantically convey their underlying purpose and logic**. 
+- On top of "multiplicative" space (entanglement/tuples), FunQy unlocks the **"additive" space (matrix/vector indices)** of a quantum system.
+- It is possible to define **non-unitary mappings** (i.e. non-square and/or non-reversible matrices), which compile using auxillary qubits as needed.
+- State initializations, repeated measurements, and dynamically adjusted circuits are all implicit to FunQy's semantics. For instance, reusing a state object will automatically reconstruct the state to circumvent the no-cloning principle. 
 - `extract` blocks **visually demonstrate quantum algorithm speed-up** by always having the same time complexity regardless of input value. 
 
 ### Build Requirements
