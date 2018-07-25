@@ -104,10 +104,11 @@ fn lib_weighted(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 fn lib_fourier(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 	match eval_exp(exp, ctx) {
 		RunVal::Index(n) if n > 0 => {
-			let w = (2_f32 * ::std::f32::consts::PI * Cf32::i() / n as f32).exp();
+			let w = (-2_f32 * ::std::f32::consts::PI * Cf32::i() / n as f32).exp();
+			let div = (n as f32).sqrt();
 			Ok(RunVal::Gate((0..n)
 				.map(|i| (0..n)
-					.map(|j| w.powc(Cf32::new((i * j) as f32, 0_f32)))
+					.map(|j| w.powc(Cf32::new((i * j) as f32, 0_f32)) / div)
 					.collect())
 				.collect()))
 		},

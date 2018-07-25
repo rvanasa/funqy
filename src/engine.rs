@@ -146,12 +146,10 @@ impl MatrixLike for Gate {
 	
 	fn is_unitary(&self) -> bool {
 		unimplemented!()
-		// // Hermitian:
+		// // self * self.inv() == identity
 		// for (i, s) in self.iter().enumerate() {
 		// 	for (j, n) in s[(i + 1)..].iter().enumerate() {
-		// 		if self[i][j] != n.conj() {
-		// 			return false
-		// 		}
+		// 		...
 		// 	}
 		// }
 		// true
@@ -192,6 +190,8 @@ impl MatrixLike for Gate {
 		}
 		let (vals, vecs) = arr.eigh(UPLO::Upper).unwrap();
 		let mut diag = Array::<Cf32, Ix2>::zeros((size, size));
+		println!("{}",vals);
+		println!("{}",vecs);
 		for (i, &d) in vals.iter().enumerate() {
 			diag[(i, i)] = real!(d).powc(p);
 		}

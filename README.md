@@ -1,6 +1,6 @@
 ## FunQy: A Next-Generation Quantum Programming Language
 
-FunQy is a novel, purely functional, architecture-agnostic quantum programming language. 
+FunQy is a novel architecture-agnostic functional quantum programming language. 
 Instead of regarding algorithms in terms of [qubits](https://en.wikipedia.org/wiki/Qubit) and [logic gates](https://en.wikipedia.org/wiki/Quantum_logic_gate), 
 FunQy can simulate any combination of quantum objects using a technique we call _pattern extraction_. 
 
@@ -13,15 +13,18 @@ This tends to be vastly more intuitive and scalable than the prevalent [circuit-
 ---
 
 Here are a few interesting outcomes of this paradigm:
-- Funqy looks and feels like a high-level programming language, **useful for classical developers** unfamiliar with quantum gates and registers.
-- All functions and values are immutable and thus **purely functional**. This declarative basis for quantum computation is more intuitive, more optimizable, and more powerful than the quantum circuit paradigm. 
-- The language is **architecture-agnostic**; qubits and gates are completely invisible to the language unless otherwise desired.
+- Funqy looks and feels like a high-level programming language, **useful for classical software engineers** unfamiliar with quantum gates and registers.
+- All states and values are immutable and thus **purely functional**. This declarative basis for quantum computation is more intuitive, more optimizable, and more powerful than the quantum circuit paradigm. 
+- The language is fully **architecture-agnostic**; qubits and gates are completely invisible to the language unless otherwise desired.
 - **Classical and quantum algorithms are defined simulaneously**; in other words, the compiler will use the classical version of a function if the input value is correspondingly classical. In effect, only operations which would actually benefit from quantum speed-up are performed on a quantum register.
 - By organizing code in terms of functions and extractions, scripts tend to **semantically convey their underlying purpose and logic**. 
 - On top of "multiplicative" space (entanglement/tuples), FunQy unlocks the **"additive" space (matrix/vector indices)** of a quantum system.
 - It is possible to define **non-unitary mappings** (i.e. non-square and/or non-reversible matrices), which compile using auxillary qubits as needed.
 - State initializations, repeated measurements, and dynamically adjusted circuits are all implicit to FunQy's semantics. For instance, reusing a state object will automatically reconstruct the state to circumvent the no-cloning principle. 
+- FunQy's type system provides the **scalability and expressiveness** needed to design and reason about algorithms for future (100+ qubit) quantum computers. 
 - `extract` blocks **visually demonstrate quantum algorithm speed-up** by always having the same time complexity regardless of input value. 
+
+---
 
 ### Build Requirements
 
@@ -30,9 +33,10 @@ Here are a few interesting outcomes of this paradigm:
 
 ### Usage Examples
 
-Evaluate a FunQy script (expects `.fqy` file extension):
+Evaluate a FunQy script:
 ```sh
-$ funqy eval path/to/ScriptFile [-o output_file.txt] [--watch]
+$ funqy eval path/to/ScriptFile.fqy [-o output_file.txt] [--watch]
+$ funqy eval github:rvanasa/funqy:tests/scripts/Test.fqy [...]
 $ funqy eval "raw: measure(sup(1,2,3))" [...]
 ```
 
@@ -107,7 +111,7 @@ let sqrt_swap = @[1/2] swap
 // Controlled gate
 fn c(gate)(ctrl, tgt) = {
 	let out = extract ctrl {
-		F => tgt, 		//	|0⟩ ⊗ tgt => |0⟩ ⊗ tgt 
+		F => tgt,	//	|0⟩ ⊗ tgt => |0⟩ ⊗ tgt 
 		T => gate(tgt),	//	|1⟩ ⊗ tgt => |0⟩ ⊗ gate(tgt)
 	}
 	(ctrl, out)
@@ -121,10 +125,10 @@ fn bell_as_circuit(q1, q2) = cnot(hadamard(q1), q2)
 
 // Bell state preparation (implemented via extraction)
 fn bell_as_extract = {
-	(F, F) => (F, F) ^ (T, T),
-	(F, T) => (F, T) ^ (T, F),
-	(T, F) => (F, F) ^ ~(T, T),
-	(T, T) => (F, T) ^ ~(T, F),
+	(F, F) => (F, F) ^ (T, T)
+	(F, T) => (F, T) ^ (T, F)
+	(T, F) => (F, F) ^ ~(T, T)
+	(T, T) => (F, T) ^ ~(T, F)
 }
 
 assert bell_as_circuit == bell_as_extract
@@ -141,16 +145,16 @@ However, the pattern extraction paradigm gains its advantage from combining diff
 
 ### Higher-Order Gate Analogy
 
-Here is an interesting outcome of using both qubit and qutrit values in a function:
+Here is an interesting outcome of using both 2D (qubit) and 3D (qutrit) values in a function:
 
 ```
 
 data Axis3 = X | Y | Z
 
 fn rotate(r)(s) = extract r {
-	X => px(s),
-	Y => py(s),
-	Z => pz(s),
+	X => px(s)
+	Y => py(s)
+	Z => pz(s)
 }
 
 assert rotate(X) == px
@@ -162,4 +166,4 @@ assert rotate(X ^ Z) == hadamard	// it's back
 
 ```
 
-For more documentation and examples, please check out the [tests](tree/master/tests) folder. 
+For more documentation and examples, please check out the [tests](https://github.com/rvanasa/funqy/tree/master/tests) folder. 

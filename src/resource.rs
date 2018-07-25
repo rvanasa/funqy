@@ -15,6 +15,9 @@ pub fn load(path: &str) -> Ret<String> {
 	if path.starts_with("raw:") {
 		Ok(path[4..].to_string())
 	}
+	// else if path.starts_with("github:") {
+	// 	load()
+	// }
 	else if path.starts_with("http://") || path.starts_with("https://") {
 		Ok(reqwest::get(path)?.text()?)
 	}
