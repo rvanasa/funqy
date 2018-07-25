@@ -4,27 +4,42 @@ FunQy is a novel, purely functional, architecture-agnostic quantum programming l
 Instead of regarding algorithms in terms of [qubits](https://en.wikipedia.org/wiki/Qubit) and [logic gates](https://en.wikipedia.org/wiki/Quantum_logic_gate), 
 FunQy can simulate any combination of quantum objects using a technique we call _pattern extraction_. 
 
-Pattern extraction is a bidirectional subset of pattern matching from classical functional programming, 
+Pattern extraction is a bidirectional analog to pattern matching from classical functional programming, 
 with the additional quantum capability of executing all paths simultaneously. 
-This abstraction provides a clear understanding of the logic and performance benefits of a particular program—instead
+This abstraction provides a clear understanding of the logic and quantum performance benefits of a particular program—instead
 of executing one path at a time, pattern extraction can execute arbitrary combinations of possible inputs. 
 This tends to be vastly more intuitive and scalable than the prevalent [circuit-based algorithm](https://arxiv.org/abs/1804.03719) conventions. 
+
+Here are a few interesting outcomes of this paradigm:
+- Funqy looks and feels like a high-level programming language, oriented for **classical developers** unfamiliar with quantum gates and registers.
+- The language is **architecture-agnostic**; qubits and gates are completely invisible to the language unless otherwise desired.
+- By organizing code in terms of functions and extractions, scripts tend to **clearly convey** their underlying purpose and logic. 
+- On top of "multiplicative" space (entanglement/tuples), FunQy unlocks the "additive" space (matrix rows/columns) of a quantum system.
+- It is possible to define **non-unitary** (i.e. non-square and/or non-reversible matrix) mappings, which compile using auxillary qubits as needed.
+- Initial state definitions, repeated measurements, and dynamically adjusted circuits are all **one-liners** using FunQy.
+- `extract` blocks **visually demonstrate quantum algorithm speed-up** by always having the same time complexity regardless of input value. 
 
 ### Build Requirements
 
 - [Nightly Rust](https://doc.rust-lang.org/1.15.1/book/nightly-rust.html) `>= 1.28.0`
-- [gfortran](http://laptops.eng.uci.edu/software-installation/getting-started-with-programming/fortran-tutorial?tmpl=%2Fsystem%2Fapp%2Ftemplates%2Fprint%2F&showPrintDialog=1) `>= 4.8`
+- [gfortran](http://laptops.eng.uci.edu/software-installation/getting-started-with-programming/fortran-tutorial?tmpl=%2Fsystem%2Fapp%2Ftemplates%2Fprint%2F&showPrintDialog=1) (required for OpenBLAS) `>= 4.8`
 
 ### Usage Examples
 
 Evaluate a FunQy script (expects `.fqy` file extension):
 ```sh
-$ funqy eval path/to/ScriptFile [-o output_file.txt]
+$ funqy eval path/to/ScriptFile [-o output_file.txt] [--watch]
+$ funqy eval "raw: measure(sup(1,2,3))" [...]
 ```
 
 Start an interactive REPL session:
 ```sh
 $ funqy repl [-h history_file.txt]
+```
+
+View all available commands:
+```sh
+$ funqy --help
 ```
 
 ### Qubit Gate Analogy

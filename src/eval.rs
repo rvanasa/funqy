@@ -114,7 +114,7 @@ impl Context {
 		use stdlib;
 		use parser;
 		
-		let (ctx, file) = if path.starts_with("raw:") {(self.clone(), path.to_string())}
+		let (ctx, file) = if path.starts_with("raw:") {(self.clone(), path.to_string() /*TODO replace with context file*/)}
 		else {
 			let import_path = Path::new(&self.path()).join(&resource::with_ext(path, "fqy"));
 			let mut import_dir = import_path.clone();

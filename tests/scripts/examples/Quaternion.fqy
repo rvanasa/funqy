@@ -1,0 +1,17 @@
+data Quat = H | I | J | K
+
+fn hmul = {
+    (H, H) => H,
+    (I, I) | (J, J) | (K, K) => ~H,
+    (H, I) => I,
+    (H, J) => J,
+    (H, K) => K,
+    (I, J) => K,
+    (J, K) => I,
+    (K, I) => J,
+    (J, I) => ~K,
+    (K, J) => ~I,
+    (I, K) => ~J,
+}
+
+print hmul(@[1/2]J, @[1/2]K)

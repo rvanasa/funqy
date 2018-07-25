@@ -1,0 +1,5 @@
+data Bool = F | T
+
+let a: (2(2Bool)) = (2T,2F)
+
+; (...2F, ...3T, ...a)

@@ -9,6 +9,8 @@ do import("examples/Random")
 do import("examples/Fourier")
 do import("examples/ESVI")
 do import("examples/TangleTree")
+do import("examples/ExpandRepeat")
+do import("examples/Quaternion")
 
 let f = if 0
 	then extract {
@@ -21,5 +23,3 @@ let f = if 0
 	}
 
 // import("examples/Concat")
-let a: (2(2Bool)) = (2T,2F)
-; (...2F, ...3T, ...a)
