@@ -42,7 +42,6 @@ where Self: ::std::marker::Sized {
 	fn pad(self, n: usize) -> Self;
 	fn sup(self, s: Self) -> Self;
 	fn normalized(self) -> Self;
-	fn extract(self, vs: Vec<Self>) -> Self;
 	fn phase(self, p: Phase) -> Self;
 	fn phase_flip(self) -> Self;
 	fn prob_sum(&self) -> f32;
@@ -64,12 +63,6 @@ impl Stateful for State {
 	fn normalized(self) -> State {
 		let div = self.prob_sum().sqrt();
 		self.into_iter().map(|s| s / div).collect()
-	}
-	
-	fn extract(self, g: Gate) -> State {
-		create_sup(self.into_iter().zip(g).map(|(x, s)| {
-			s.iter().map(|y| x * y).collect()
-		}).collect())
 	}
 	
 	fn phase(self, p: Phase) -> State {
@@ -100,6 +93,24 @@ impl Stateful for State {
 		let mut wc = WeightedChoice::new(&mut weights);
 		let mut rng = thread_rng();
 		wc.sample(&mut rng)
+	}
+}
+
+pub trait Extract {
+	fn extract(self, Gate) -> Self;
+}
+
+impl Extract for State {
+	fn extract(self, g: Gate) -> State {
+		create_sup(self.into_iter().zip(g).map(|(x, s)| {
+			s.iter().map(|y| x * y).collect()
+		}).collect())
+	}
+}
+
+impl Extract for Gate {
+	fn extract(self, g: Gate) -> Gate {
+		self.into_iter().map(|state| state.extract(g.clone())).collect() /////??
 	}
 }
 
@@ -156,6 +167,7 @@ impl MatrixLike for Gate {
 	}
 	
 	fn inverse(self) -> Gate {
+		// Requires unitary matrix
 		let mut dims: Gate = vec![];
 		for i in 0..self.width() {
 			let mut dim: State = vec![];
@@ -175,28 +187,55 @@ impl MatrixLike for Gate {
 	}
 	
 	fn power(self, p: Phase) -> Self {
-		use ndarray::{Array, Ix2};
-		use ndarray_linalg::*;
+		use lapacke::*;
+		use num::Zero;
 		use num::One;
 		if p.is_one() {
 			return self
 		}
+		
 		let size = ::std::cmp::max(self.len(), self.width());
-		let mut arr = Array::<Cf32, Ix2>::zeros((size, size));
+		let mut mat = vec![c64::zero(); size * size];
 		for (i, s) in self.into_iter().enumerate() {
 			for (j, n) in s.into_iter().enumerate() {
-				arr[(i, j)] = n;
+				mat[i * size + j] = c64::new(n.re as f64, n.im as f64);
 			}
 		}
-		let (vals, vecs) = arr.eigh(UPLO::Upper).unwrap();
-		let mut diag = Array::<Cf32, Ix2>::zeros((size, size));
-		println!("{}",vals);
-		println!("{}",vecs);
-		for (i, &d) in vals.iter().enumerate() {
-			diag[(i, i)] = real!(d).powc(p);
+		
+		let mut vals = vec![c64::zero(); size];
+		let mut vecs = vec![c64::zero(); size * size];
+		// let mut ivecs: Vec<c64>;
+		unsafe {
+			fn wrap_status(status: i32) {
+				if status != 0 {
+					panic!(status);
+				}
+			}
+			// let mut pivots = vec![0; size];
+			let size = size as i32;
+			wrap_status(zgeev(Layout::RowMajor, b'N', b'V', size, &mut mat[..], size, &mut vals[..], &mut [], size, &mut vecs[..], size));
+			// ivecs = vecs.clone();
+			// wrap_status(zgetrf(Layout::RowMajor, size, size, &mut ivecs, size, &mut pivots));
+			// wrap_status(zgetri(Layout::RowMajor, size, &mut ivecs, size, &pivots[..]));
 		}
-		let out = vecs.inv().unwrap().dot(&diag).dot(&vecs);
-		(0..out.rows()).map(|i| out.row(i).to_vec()).collect()
+		
+		fn to_state(v: Vec<c64>) -> State {
+			v.into_iter().map(|c| Cf32::new(c.re as f32, c.im as f32)).collect()
+		}
+		fn to_gate(v: Vec<c64>, n: usize) -> Gate {
+			(0..n).map(|i| to_state(v[n * i .. n * (i + 1)].to_vec())).collect()
+		}
+		let vals = to_state(vals);
+		let vecs = to_gate(vecs, size);
+		// let ivecs = to_gate(ivecs, size);
+		let ivecs = vecs.clone().inverse();
+		
+		let diag = (0..size).map(|i| {
+			let mut vec = vec![real!(0); size];
+			vec[i] = vals[i] * p;
+			vec
+		}).collect();
+		ivecs.extract(diag).extract(vecs)
 	}
 }
 

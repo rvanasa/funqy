@@ -2,13 +2,16 @@
 
 FunQy is a novel architecture-agnostic functional quantum programming language. 
 Instead of regarding algorithms in terms of [qubits](https://en.wikipedia.org/wiki/Qubit) and [logic gates](https://en.wikipedia.org/wiki/Quantum_logic_gate), 
-FunQy can simulate any combination of quantum objects using a technique we call _pattern extraction_. 
+FunQy can simulate any combination of quantum objects using what we call _pattern extraction_.
 
 Pattern extraction is a bidirectional analog to pattern matching from classical functional programming, 
 with the additional quantum capability of executing all paths simultaneously. 
 This abstraction provides a clear understanding of the logic and quantum performance benefits of a particular program—instead
 of executing one path at a time, pattern extraction can execute arbitrary combinations of possible inputs. 
 This tends to be vastly more intuitive and scalable than the prevalent [circuit-based algorithm](https://arxiv.org/abs/1804.03719) conventions. 
+
+Most of the existing "high-level" quantum programming languages are just preprocessors for defining these quantum circuits.
+FunQy exposes powerful layers of abstraction that are fully independent of the underlying architecture.
 
 ---
 
