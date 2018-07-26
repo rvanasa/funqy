@@ -243,17 +243,10 @@ impl MatrixLike for Gate {
 
 // Create a superposition of the given states
 pub fn create_sup(states: Vec<State>) -> State {
-	let div = states.iter().map(|v| v.prob_sum())
-		.fold(0_f32, |a, b| a + b).sqrt();
-	
+	let div = (states.len() as f32).sqrt();
 	states.into_iter().fold(vec![], |a, b| pad_zip(a, b, |x, y| x + y))
 		.into_iter().map(|x| x / div).collect()
 }
-
-// fn normalize(state: State) -> State {
-// 	let mag = state.iter().fold(real!(0), |a, b| a + (b * b));
-// 	state.into_iter().map(|x| x / mag.sqrt()).collect()
-// }
 
 // Create a unit vector state in the given Hilbert dimension
 pub fn get_state(n: usize) -> State {
