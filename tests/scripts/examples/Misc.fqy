@@ -47,14 +47,16 @@ fn had = {
 	T => F ^ ~T,
 }
 
-fn had2 {
-	F => F,
-	F => T,
-	T => F,
-	T => phf(T),
-}
+// Syntax up for debate
 
-assert (had(F ^ T), had(F ^ ~T)) == (had2(F ^ T), had2(F ^ ~T))
+// fn had2 {
+// 	F => F,
+// 	F => T,
+// 	T => F,
+// 	T => phf(T),
+// }
+
+// assert (had(F ^ T), had(F ^ ~T)) == (had2(F ^ T), had2(F ^ ~T))
 
 fn cnot(a, b) = extract a {
 	F => (F, b),
@@ -116,15 +118,4 @@ fn sqrt(f) = @[1/2] gate(f)
 fn ctrl(c, fg, tg)(q) = extract c {
 	F => fg(q),
 	T => tg(q),
-};
-
-let qft2 = (had, had)
-let qft4 = (qft2, qft2)
-// let qft8 = (qft4, qft4)
-
-// assert ctrl(had(F), px, py)(F) == [1/4] T
-
-let series = ^(0, 5, 10, 15)
-
-print series
-print qft4(data)
+}

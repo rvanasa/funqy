@@ -32,7 +32,7 @@ Here are a few interesting outcomes of this paradigm:
 ### Build Requirements
 
 - [Nightly Rust](https://doc.rust-lang.org/1.15.1/book/nightly-rust.html) `>= 1.28.0`
-- [gfortran](http://laptops.eng.uci.edu/software-installation/getting-started-with-programming/fortran-tutorial?tmpl=%2Fsystem%2Fapp%2Ftemplates%2Fprint%2F&showPrintDialog=1) (required for OpenBLAS) `>= 4.8`
+- [gfortran](http://laptops.eng.uci.edu/software-installation/getting-started-with-programming/fortran-tutorial?tmpl=%2Fsystem%2Fapp%2Ftemplates%2Fprint%2F&showPrintDialog=1) (required for LAPACKE) `>= 4.8`
 
 ### Usage Examples
 
@@ -128,10 +128,10 @@ fn bell_as_circuit(q1, q2) = cnot(hadamard(q1), q2)
 
 // Bell state preparation (implemented via extraction)
 fn bell_as_extract = {
-	(F, F) => (F, F) ^ (T, T)
-	(F, T) => (F, T) ^ (T, F)
-	(T, F) => (F, F) ^ ~(T, T)
-	(T, T) => (F, T) ^ ~(T, F)
+	(F, F) => (F, F) ^ (T, T),
+	(F, T) => (F, T) ^ (T, F),
+	(T, F) => (F, F) ^ ~(T, T),
+	(T, T) => (F, T) ^ ~(T, F),
 }
 
 assert bell_as_circuit == bell_as_extract

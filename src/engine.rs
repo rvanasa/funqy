@@ -102,15 +102,17 @@ pub trait Extract {
 
 impl Extract for State {
 	fn extract(self, g: Gate) -> State {
-		create_sup(self.into_iter().zip(g).map(|(x, s)| {
-			s.iter().map(|y| x * y).collect()
-		}).collect())
+		self.into_iter().zip(g).map(|(x, s)| {
+			s.into_iter().map(|y| x * y).collect()
+		}).fold(vec![], |a, b| pad_zip(a, b, |x, y| x + y))
 	}
 }
 
 impl Extract for Gate {
 	fn extract(self, g: Gate) -> Gate {
-		self.into_iter().map(|state| state.extract(g.clone())).collect() /////??
+		self.into_iter().map(|state| {
+			state.extract(g.clone())
+		}).collect()
 	}
 }
 
@@ -208,7 +210,7 @@ impl MatrixLike for Gate {
 		unsafe {
 			fn wrap_status(status: i32) {
 				if status != 0 {
-					panic!(status);
+					panic!(status)
 				}
 			}
 			// let mut pivots = vec![0; size];
@@ -232,7 +234,7 @@ impl MatrixLike for Gate {
 		
 		let diag = (0..size).map(|i| {
 			let mut vec = vec![real!(0); size];
-			vec[i] = vals[i] * p;
+			vec[i] = vals[i].powc(p);
 			vec
 		}).collect();
 		ivecs.extract(diag).extract(vecs)
@@ -244,7 +246,7 @@ pub fn create_sup(states: Vec<State>) -> State {
 	let div = states.iter().map(|v| v.prob_sum())
 		.fold(0_f32, |a, b| a + b).sqrt();
 	
-	states.into_iter().fold(vec![], |a, b| zip(a, b, |x, y| x + y))
+	states.into_iter().fold(vec![], |a, b| pad_zip(a, b, |x, y| x + y))
 		.into_iter().map(|x| x / div).collect()
 }
 
@@ -263,7 +265,7 @@ pub fn get_state(n: usize) -> State {
 	state
 }
 
-fn zip<T>(a: State, b: State, f: T) -> State
+fn pad_zip<T>(a: State, b: State, f: T) -> State
 where T: Fn(Cf32, Cf32) -> Cf32 {
 	let zero = real!(0);
 	// let (a, b) = if a.len() > b.len() {(a, b)} else {(b, a)};

@@ -6,8 +6,6 @@ extern crate reqwest;
 extern crate num;
 #[macro_use]
 extern crate nom;
-// extern crate ndarray;
-// extern crate ndarray_linalg;
 extern crate lapacke;
 extern crate openblas_src;
 

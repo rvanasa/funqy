@@ -276,7 +276,16 @@ pub fn eval_decl(decl: &Decl, ctx: &mut Context) -> Ret {
 		&Decl::Assert(ref expect, ref result) => {
 			let a = eval_exp(expect, ctx);
 			let b = eval_exp(result, ctx);
-			if a != b {err!("Assertion failed: {} != {}", a, b)}
+			let eq = match (&a, &b) {
+				(&RunVal::State(ref a, _), &RunVal::State(ref b, _)) => {
+					a.iter().zip(b).map(|(a, b)| {
+						let abs = (a - b).norm();
+						abs * abs
+					}).sum::<f32>() < 0.00001_f32
+				},
+				(a, b) => a == b,
+			};
+			if !eq {err!("Assertion failed: {} != {}", a, b)}
 			else {Ok(())}
 		},
 		&Decl::Print(ref exp) => Ok(println!(":: {}", eval_exp(exp, ctx))),

@@ -7,14 +7,14 @@ let (#) = measure
 data Quat = H | I | J | K
 
 fn (*) = {
-    (H, H) => H
-    (I, I) | (J, J) | (K, K) => ~H
-    (H, I) | (J, K) => I
-    (H, J) | (K, I) => J
-    (H, K) | (I, J) => K
-    (J, I) => ~K
-    (K, J) => ~I
-    (I, K) => ~J
+    (H, H) => H,
+    (I, I) | (J, J) | (K, K) => ~H,
+    (H, I) | (J, K) => I,
+    (H, J) | (K, I) => J,
+    (H, K) | (I, J) => K,
+    (J, I) => ~K,
+    (K, J) => ~I,
+    (I, K) => ~J,
 }
 
 print sup(I, J, K) * sup(~I, J, ~K)
