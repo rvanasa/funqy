@@ -7,6 +7,8 @@ fn equal = {
 	_ => F,
 }
 
+fn (.)(f, g)(a) = g(f(a))
+
 fn (@)(s) = sup(s)
 let (#) = measure
 

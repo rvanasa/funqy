@@ -24,7 +24,8 @@ pub fn create_ctx(path: &str) -> Ret<Context> {
 		let ((^), (~), (#)) = (sup, phf, measure)
 		fn (>>)(x, f) = f(x)
 		fn (<<)(f, x) = f(x)
-		fn (.)(f, g)(a) = g(f(a))
+		fn (>.)(f, g)(a) = g(f(a))
+		fn (<.)(f, g)(a) = f(g(a))
 		fn (..)(r)(s) = slice(s, r)
 	"#.to_string())?, &mut ctx);
 	Ok(ctx)
