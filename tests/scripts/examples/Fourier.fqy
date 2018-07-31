@@ -1,9 +1,6 @@
 // Quantun Fourier Transform example using a predefined data set
 
-fn ($)(x, f) = f(x)
-fn (..)(r)(s) = slice(s, r)
-
-let state = sup(2, 5, 9, 11) $ ..16
+let state = sup(2, 5, 9, 11) >> ..16
 
 print state
 

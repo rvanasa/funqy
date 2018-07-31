@@ -1,5 +1,3 @@
-data Bool = F | T
-
 type Reg3 = (Bool, Bool, Bool)
 
 fn tangle_qb_reg((a, b, c): Reg3): Reg3 = {

@@ -1,4 +1,5 @@
 use error::*;
+use parser::parse;
 use ast::Exp;
 use engine::*;
 use eval::*;
@@ -17,6 +18,15 @@ pub fn create_ctx(path: &str) -> Ret<Context> {
 	ctx.add_macro("fourier", &lib_fourier)?;
 	ctx.add_macro("repeat", &lib_repeat)?;
 	ctx.add_macro("measure", &lib_measure)?;
+	eval_exp_inline(&parse(r#"
+		data Bool = F | T
+		data Axis = X | Y | Z
+		let ((^), (~), (#)) = (sup, phf, measure)
+		fn (>>)(x, f) = f(x)
+		fn (<<)(f, x) = f(x)
+		fn (.)(f, g)(a) = g(f(a))
+		fn (..)(r)(s) = slice(s, r)
+	"#.to_string())?, &mut ctx);
 	Ok(ctx)
 }
 

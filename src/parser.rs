@@ -41,7 +41,7 @@ named!(int_literal<isize>, do_parse!(
 	(nat as isize * sig.unwrap_or(1))
 ));
 
-named!(string_literal<String>, delimited!(
+named!(string_literal<String>, ws!(delimited!(
 	tag!("\""),
 	fold_many0!(
 		alt!(
@@ -52,7 +52,7 @@ named!(string_literal<String>, delimited!(
 		|a, b| format!("{}{}", a, String::from_utf8_lossy(b))
 	),
 	tag!("\"")
-));
+)));
 
 named!(index_literal<usize>,
 	alt!(hex_literal | bin_literal | dec_literal)
@@ -223,6 +223,8 @@ named!(arg_exp<Exp>, alt!(
 	preceded!(ws!(tag!("...")), alt!(repeat_exp | exp)) => {|exp| Exp::Expand(Rc::new(exp))} |
 	repeat_exp |
 	exp
+	// exp |
+	// map!(opr_ident, Exp::Var)
 ));
 
 named!(prefix_opr_exp<Exp>, do_parse!(

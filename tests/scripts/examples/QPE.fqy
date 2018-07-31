@@ -1,8 +1,5 @@
 // Quantum Phase (Eigenvalue) Estimation
 
-data Bool = F | T
-let (^) = sup
-
 fn QPE(g) = {
 	// TODO
 }
