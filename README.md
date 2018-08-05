@@ -39,7 +39,7 @@ Here are a few interesting outcomes of this paradigm:
 Evaluate a FunQy script:
 ```sh
 $ funqy eval path/to/ScriptFile.fqy [-o output_file.txt] [--watch]
-$ funqy eval github:rvanasa/funqy:tests/scripts/Test.fqy [...]
+$ funqy eval https://some.cdn/file/ScriptFile.fqy [...]
 $ funqy eval "raw: measure(sup(1,2,3))" [...]
 ```
 
@@ -59,9 +59,9 @@ $ funqy --help
 
 data Qubit = F | T		//	Define |0⟩ as `F` and |1⟩ as `T`
 
-let (^) = sup			// Define superposition operator
-let (~) = phf			// Define phase flip operator
-let (#) = measure		// Define measurement operator
+let (^) = sup			//	Define superposition operator
+let (~) = phf			//	Define phase flip operator
+let (#) = measure		//	Define measurement operator
 
 // identity (no change)
 fn id = {
