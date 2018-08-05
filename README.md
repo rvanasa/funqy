@@ -65,14 +65,14 @@ let (#) = measure		// Define measurement operator
 
 // identity (no change)
 fn id = {
-	F => F,				//	|0⟩ => |0⟩
-	T => T,				//	|1⟩ => |1⟩
+	F => F,			//	|0⟩ => |0⟩
+	T => T,			//	|1⟩ => |1⟩
 }
 
 // Pauli-X rotation (NOT gate)
 fn px = {
-	F => T,				//	|0⟩ => |1⟩
-	T => F,				//	|1⟩ => |0⟩
+	F => T,			//	|0⟩ => |1⟩
+	T => F,			//	|1⟩ => |0⟩
 }
 let not = px
 let (!) = px
@@ -85,8 +85,8 @@ fn py = {
 
 // Pauli-Z rotation
 fn pz = {
-	F => F,				//	|0⟩ => |0⟩
-	T => ~T,			//	|1⟩ => -|1⟩
+	F => F,			//	|0⟩ => |0⟩
+	T => ~T,		//	|1⟩ => -|1⟩
 }
 
 // Hadamard gate
@@ -115,7 +115,7 @@ let sqrt_swap = @[1/2] swap
 fn c(gate)(ctrl, tgt) = {
 	let out = extract ctrl {
 		F => tgt,	//	|0⟩ ⊗ tgt => |0⟩ ⊗ tgt 
-		T => gate(tgt),	//	|1⟩ ⊗ tgt => |0⟩ ⊗ gate(tgt)
+		T => gate(tgt),	//	|1⟩ ⊗ tgt => |1⟩ ⊗ gate(tgt)
 	}
 	(ctrl, out)
 }
