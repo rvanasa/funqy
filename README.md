@@ -1,8 +1,8 @@
 ## FunQy: A Next-Generation Quantum Programming Language
 
 FunQy is a novel functional quantum/classical hybrid programming language. 
-Instead of regarding algorithms in terms of [qubits](https://en.wikipedia.org/wiki/Qubit) and [logic gates](https://en.wikipedia.org/wiki/Quantum_logic_gate), 
-FunQy can simulate any combination of quantum objects using what we call _pattern extraction_.
+Instead of describing algorithms in terms of quantum [logic gates](https://en.wikipedia.org/wiki/Quantum_logic_gate), registers, and [qubits](https://en.wikipedia.org/wiki/Qubit),
+FunQy operates purely in terms of functions, values, and states using what we call _pattern extraction_.
 
 Pattern extraction is a bidirectional analog to pattern matching from classical functional programming, 
 with the additional quantum capability of executing all paths simultaneously. 
