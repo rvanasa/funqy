@@ -47,9 +47,13 @@ fn lib_sup(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 
 fn lib_phf(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 	let val = eval_exp(exp, ctx);
-	Ok(build_gate(&val, ctx)
-		.map(|g| RunVal::Gate(g.negate()))
-		.unwrap_or_else(|| RunVal::State(build_state(val).phase_flip(), Type::Any /* TODO same type as input */)))
+	let gate = build_gate(&val, ctx)
+		.map(|g| RunVal::Gate(g.negate()));
+	if let Some(g) = gate {Ok(g)}
+	else {
+		let (s, t) = build_state_typed(val)?;
+		Ok(RunVal::State(s.phase_flip(), t))
+	}
 }
 
 fn lib_gate(exp: &Exp, ctx: &Context) -> Ret<RunVal> {

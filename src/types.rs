@@ -73,11 +73,18 @@ impl Type {
 		match self {
 			Type::Any => Ok(RunVal::Index(n)),
 			Type::Data(ref dt) => Ok(RunVal::Data(dt.clone(), n)),
-			Type::Tuple(ref _types) => {
-				unimplemented!()
+			Type::Tuple(ref types) => {
+				let mut total_size = self.size().unwrap_or(0);
+				let mut vals = vec![];
+				for t in types {
+					let size = t.size().ok_or_else(|| Error(format!("{} does not have a known size", t)))?;
+					total_size /= size;
+					vals.push(t.from_index((n / total_size) % size)?);
+				}
+				Ok(RunVal::Tuple(vals))
 			},
-			Type::Concat(ref _types) => {
-				unimplemented!()
+			Type::Concat(_) => {
+				err!("No index structure {} for type {}", n, self)
 			},
 		}
 	}

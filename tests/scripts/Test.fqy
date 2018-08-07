@@ -17,4 +17,4 @@ let f = if 0
 		(T, F) => (~F, ~T),
 	}
 
-// import("examples/Concat")
+import("examples/Concat")

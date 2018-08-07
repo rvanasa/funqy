@@ -159,10 +159,20 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 		},
 		&Exp::Expand(_) => panic!("No context for expansion"),
 		&Exp::Tuple(ref args) => RunVal::Tuple(eval_exp_seq(args, ctx)),
-		&Exp::Concat(ref args) => RunVal::State(args.iter()
-			.flat_map(|e| build_state(eval_exp(e, ctx)))
-			.collect::<State>().normalized(), // TODO gates
-			Type::Any),
+		&Exp::Concat(ref args) => {
+			//TODO gates
+			let div = (args.len() as f32).sqrt();
+			let states = args.iter()
+				.map(|e| build_state_typed(eval_exp(e, ctx)))
+				.collect::<Ret<Vec<(State, Type)>>>().unwrap();
+			RunVal::State(states.iter()
+				.flat_map(|(s, _)| s)
+				.map(|n| n / div)
+				.collect(),
+				Type::Concat(states.into_iter()
+					.map(|(_, t)| t)
+					.collect()))
+		},
 		&Exp::Cond(ref cond_exp, ref then_exp, ref else_exp) => {
 			let val = eval_exp(cond_exp, ctx);
 			if let Some(b) = build_bool(&val) {
@@ -176,7 +186,7 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 				RunVal::State(state.extract(vec![
 					build_state(eval_exp(else_exp, ctx)),
 					build_state(eval_exp(then_exp, ctx)),
-				]), Type::Any /* TODO sum of then/else types */)
+				]), Type::Any /* TODO LCM of then/else types */)
 			}
 		},
 		&Exp::Lambda(ref pat, ref body) => {
@@ -192,12 +202,15 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 					eval_exp(&body, &fn_ctx)
 				},
 				RunVal::Macro(Macro(_, handle)) => handle(arg, ctx).unwrap(),
-				RunVal::Gate(gate) => RunVal::State(build_state(eval_exp(arg, ctx)).extract(gate), Type::Any /* TODO maintain arg type */),
+				RunVal::Gate(gate) => {
+					let (s, t) = build_state_typed(eval_exp(arg, ctx)).unwrap();
+					RunVal::State(s.extract(gate), t)
+				},
 				val => {
 					let msg = &format!("Cannot invoke {}", val);
 					let state = build_state(eval_exp(arg, ctx));
 					let gate = build_gate(&val, ctx).expect(msg);
-					RunVal::State(state.extract(gate), Type::Any /* TODO maintain arg type */)
+					RunVal::State(state.extract(gate), Type::Any /* TODO infer output type from `target` */)
 				},
 			}
 		},
@@ -205,17 +218,23 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 			let val = eval_exp(&*exp, ctx);
 			RunVal::Tuple((0..n).map(|_| val.clone()).collect())
 		},
-		&Exp::State(ref arg) => RunVal::State(build_state(eval_exp(arg, ctx)), Type::Any /* TODO maintain arg type */),
+		&Exp::State(ref arg) => {
+			let (s, t) = build_state_typed(eval_exp(arg, ctx)).unwrap();
+			RunVal::State(s, t)
+		},
 		&Exp::Phase(phase, ref arg) => {
 			let val = eval_exp(arg, ctx);
 			build_gate(&val, ctx)
 				.map(|g| RunVal::Gate(g.power(phase)))
-				.unwrap_or_else(|| RunVal::State(build_state(val).phase(phase), Type::Any /* TODO maintain val type */))
+				.unwrap_or_else(|| {
+					let (s, t) = build_state_typed(val).unwrap();
+					RunVal::State(s.phase(phase), t)
+				})
 		},
 		&Exp::Extract(ref arg, ref cases) => {
-			let state = build_state(eval_exp(arg, ctx));
+			let (s, t) = build_state_typed(eval_exp(arg, ctx)).unwrap();
 			let gate = create_extract_gate(cases, ctx);
-			RunVal::State(state.extract(gate), Type::Any /* TODO maintain gate type */)
+			RunVal::State(s.extract(gate), t)
 		},
 		&Exp::Anno(ref exp, ref anno) => eval_type(anno, ctx).unwrap().assign(eval_exp(exp, ctx)).unwrap(),
 	}
@@ -308,9 +327,9 @@ pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Ret {
 					.collect::<Ret<_>>()
 			}
 		},
-		(&Pat::Concat(ref _pats), &RunVal::State(ref _state, _)) => {
-			unimplemented!()
-		},
+		// (&Pat::Concat(ref pats), val) => {
+		// unimplemented!()
+		// },
 		(&Pat::Anno(ref pat, ref anno), val) => assign_pat(pat, &eval_type(&**anno, ctx)?.assign(val.clone())?, ctx),
 		_ => err!("{:?} cannot deconstruct `{}`", pat, val),
 	}
@@ -332,7 +351,11 @@ pub fn build_state_typed(val: RunVal) -> Ret<(State, Type)> {
 	match val {
 		RunVal::Index(n) => Ok((get_state(n), Type::Any)),
 		RunVal::Data(dt, index) => Ok((get_state(index).pad(dt.variants.len()), Type::Data(dt))),
-		RunVal::Tuple(vals) => Ok((vals.into_iter().fold(get_state(0), |a, b| a.combine(build_state(b))), Type::Any /* TODO type from vals */)),
+		RunVal::Tuple(vals) => {
+			let states = vals.into_iter().map(|v| build_state_typed(v)).collect::<Ret<Vec<(State, Type)>>>()?;
+			let ty = Type::Tuple(states.iter().map(|(_, t)| t.clone()).collect());
+			Ok((states.into_iter().fold(get_state(0), |a, (b, _)| State::combine(a, b)), ty))
+		},
 		RunVal::State(state, ty) => Ok((state, ty)),
 		val => err!("Cannot build state from {}", val)
 	}

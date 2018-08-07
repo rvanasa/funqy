@@ -6,12 +6,12 @@ let (#) = measure
 
 data Quat = H | I | J | K
 
-fn (*) = {
+fn (*)(a: Quat, b: Quat): Quat = extract (a, b) {
     (H, H) => H,
     (I, I) | (J, J) | (K, K) => ~H,
-    (H, I) | (J, K) => I,
-    (H, J) | (K, I) => J,
-    (H, K) | (I, J) => K,
+    (H, I) | (I, H) | (J, K) => I,
+    (H, J) | (J, H) | (K, I) => J,
+    (H, K) | (K, H) | (I, J) => K,
     (J, I) => ~K,
     (K, J) => ~I,
     (I, K) => ~J,
@@ -19,4 +19,4 @@ fn (*) = {
 
 print sup(I, J, K) * sup(~I, J, ~K)
 
-print measure(@[1/2]J * @[1/2]K): Quat
+print @[1/2]J * @[1/2]K

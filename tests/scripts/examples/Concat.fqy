@@ -1,2 +1,9 @@
+let state = [T, F]
 
-[]
+print state
+print extract state {
+	[F, F] => T,
+	[F, T] => F,
+	[T, F] => ~T,
+	[T, T] => ~F,
+}

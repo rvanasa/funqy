@@ -187,7 +187,7 @@ named!(phase_exp<Exp>, do_parse!(
 		tuple!(phase, opt!(map!(preceded!(ws!(tag!(",")), phase), |p| p * Phase::i()))),
 		ws!(tag!("]"))
 	)) >>
-	exp: exp >>
+	exp: target_exp >>
 	(Exp::Phase(phase.0 + phase.1.unwrap_or(::num::Zero::zero()), Rc::new(exp)))
 ));
 
