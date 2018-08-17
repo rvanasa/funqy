@@ -22,6 +22,7 @@ pub fn create_ctx(path: &str) -> Ret<Context> {
 		data Bool = F | T
 		data Axis = X | Y | Z
 		let ((^), (~), (#)) = (sup, phf, measure)
+		fn identity(a) = a
 		fn (>>)(x, f) = f(x)
 		fn (<<)(f, x) = f(x)
 		fn (>.)(f, g)(a) = g(f(a))

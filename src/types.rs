@@ -47,7 +47,7 @@ impl Type {
 					types.iter().zip(args).map(|(p, a)| p.assign(a.clone())).collect::<Ret<_>>().map(RunVal::Tuple)
 				}
 			},
-			// TODO concat assignments?
+			(_, RunVal::Tuple(ref args)) => unimplemented!(), // TODO
 			(_, RunVal::Index(n)) => self.from_index(n),
 			(_, RunVal::Data(_, n)) => self.from_index(n),
 			(_, RunVal::State(state, _)) => {
@@ -65,7 +65,7 @@ impl Type {
 			Type::Any => None,
 			Type::Data(ref dt) => Some((*dt.clone()).variants.len()),
 			Type::Tuple(ref types) => types.iter().map(Type::size).fold(Some(1), |a, b| a.and_then(|a| b.map(|b| a * b))),
-			Type::Concat(ref types) => types.iter().map(Type::size).fold(Some(1), |a, b| a.and_then(|a| b.map(|b| a + b))),
+			Type::Concat(ref types) => types.iter().map(Type::size).fold(Some(0), |a, b| a.and_then(|a| b.map(|b| a + b))),
 		}
 	}
 	
@@ -74,18 +74,16 @@ impl Type {
 			Type::Any => Ok(RunVal::Index(n)),
 			Type::Data(ref dt) => Ok(RunVal::Data(dt.clone(), n)),
 			Type::Tuple(ref types) => {
-				let mut total_size = self.size().unwrap_or(0);
+				let mut total_size = 1;
 				let mut vals = vec![];
 				for t in types {
 					let size = t.size().ok_or_else(|| Error(format!("{} does not have a known size", t)))?;
-					total_size /= size;
 					vals.push(t.from_index((n / total_size) % size)?);
+					total_size *= size;
 				}
 				Ok(RunVal::Tuple(vals))
 			},
-			Type::Concat(_) => {
-				err!("No index structure {} for type {}", n, self)
-			},
+			Type::Concat(_) => err!("No index structure {} for type {}", n, self),
 		}
 	}
 }

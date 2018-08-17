@@ -1,0 +1,28 @@
+// Einstein-Podolsky-Rosen qubit pair (Bell state) examples
+
+data Bell = A | B | C | D
+
+fn bell = {
+	A => A ^ D,
+	B => A ^ ~D,
+	C => B ^ C,
+	D => B ^ ~C,
+}
+let ibell = inv(bell)
+
+// Note that the brackets around [Bell] designate a typed state rather than a list/array
+fn superdense_coding(epr: [Bell], desired: 2Bool): Bell = {
+	epr >> (extract desired {
+		(F, F) => identity,
+		(T, F) => pz,
+		(F, T) => px,
+		(T, T) => pz >. px,
+	}, \x: Bool -> x)
+}
+
+let qubits = (F, F) // (F, F) == A
+let epr = bell(qubits)
+
+let desired = (T, F)
+let sdc = superdense_coding(epr, desired)
+assert measure(ibell(sdc)) == desired

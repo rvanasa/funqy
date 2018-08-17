@@ -6,15 +6,8 @@ do import("examples/ESVI")
 do import("examples/TangleTree")
 do import("examples/ExpandRepeat")
 do import("examples/Quaternion")
+do import("examples/Concat")
+// do import("examples/EPR")
 
-let f = if 0
-	then extract {
-		(F, T) => @[1/2] (T, F),
-		(T, F) => @[-1/2] (F, T),
-	}
-	else extract {
-		(F, T) => (~T, ~F),
-		(T, F) => (~F, ~T),
-	}
+print "----"
 
-import("examples/Concat")

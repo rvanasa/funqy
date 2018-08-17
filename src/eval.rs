@@ -58,7 +58,7 @@ impl fmt::Display for RunVal {
 pub struct Context {
 	path: String,
 	vars: HashMap<Ident, RunVal>,
-	types: HashMap<Ident, Type>,
+	types: TypeContext,
 }
 
 impl Context {
@@ -66,12 +66,16 @@ impl Context {
 		Context {
 			path: path,
 			vars: HashMap::new(),
-			types: HashMap::new(),
+			types: TypeContext::new(),
 		}
 	}
 	
 	pub fn path<'a>(&'a self) -> &'a String {
 		&self.path
+	}
+	
+	pub fn types<'a>(&'a self) -> &'a TypeContext {
+		&self.types
 	}
 	
 	pub fn create_child(&self) -> Context {
@@ -82,30 +86,29 @@ impl Context {
 		find("Variable", id, self.vars.get(id))
 	}
 	
-	pub fn add_var(&mut self, id: Ident, val: RunVal) -> Ret {
-		self.vars.insert(id, val);
-		Ok(())
+	pub fn add_var(&mut self, id: Ident, val: RunVal, ty: Type) -> Ret {
+		self.vars.insert(id.clone(), val);
+		self.types.add_var_type(id, ty)
 	}
 	
 	pub fn find_type(&self, id: &Ident) -> Ret<Type> {
-		find("Type", id, self.types.get(id))
+		self.types.find_type(id)
 	}
 	
-	pub fn add_type(&mut self, id: Ident, ty: Type) -> Ret {
-		self.types.insert(id, ty);
-		Ok(())
+	pub fn add_type(&mut self, id: String, ty: Type) -> Ret {
+		self.types.add_type(id, ty)
 	}
 	
 	pub fn add_datatype(&mut self, id: String, variants: Vec<Ident>) -> Ret {
 		let rc = Rc::new(DataType {id: id.clone(), variants: variants.clone()});
 		for (i, variant) in variants.iter().enumerate() {
-			self.add_var(variant.clone(), RunVal::Data(rc.clone(), i))?;
+			self.add_var(variant.clone(), RunVal::Data(rc.clone(), i), Type::Data(rc.clone()))?;
 		}
 		self.add_type(id, Type::Data(rc))
 	}
 	
 	pub fn add_macro(&mut self, id: &str, handle: &'static Fn(&Exp, &Context) -> Ret<RunVal>) -> Ret {
-		self.add_var(id.to_string(), RunVal::Macro(Macro(id.to_string(), Rc::new(handle))))
+		self.add_var(id.to_string(), RunVal::Macro(Macro(id.to_string(), Rc::new(handle))), Type::Any /* TODO define macro types */)
 	}
 	
 	pub fn import(&self, path: &str) -> Ret<Module> {
@@ -131,6 +134,37 @@ impl Context {
 	pub fn import_eval(&self, path: &str) -> Ret<RunVal> {
 		let mut module = self.import(path)?;
 		Ok(eval_exp_inline(&module.exp, &mut module.ctx))
+	}
+}
+
+#[derive(Clone,Debug,PartialEq)]
+pub struct TypeContext {
+	types: HashMap<Ident, Type>,
+}
+
+impl TypeContext {
+	pub fn new() -> TypeContext {
+		TypeContext {
+			types: HashMap::new(),
+		}
+	}
+	
+	pub fn add_type(&mut self, id: Ident, ty: Type) -> Ret {
+		self.types.insert(id, ty);
+		Ok(())
+	}
+	
+	pub fn find_type(&self, id: &Ident) -> Ret<Type> {
+		find("Type", id, self.types.get(id))
+	}
+	
+	pub fn add_var_type(&mut self, id: Ident, ty: Type) -> Ret {
+		self.types.insert(format!("@{}", id), ty);
+		Ok(())
+	}
+	
+	pub fn find_var_type(&self, id: &Ident) -> Ret<Type> {
+		find("Variable type", id, self.types.get(&format!("@{}", id)))
 	}
 }
 
@@ -186,13 +220,10 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 				RunVal::State(state.extract(vec![
 					build_state(eval_exp(else_exp, ctx)),
 					build_state(eval_exp(then_exp, ctx)),
-				]), Type::Any /* TODO LCM of then/else types */)
+				]), Type::Any /* TODO determine from then/else types */)
 			}
 		},
-		&Exp::Lambda(ref pat, ref body) => {
-			let fn_ctx = ctx.create_child(); // TODO optimize?
-			RunVal::Func(Rc::new(fn_ctx), pat.clone(), (**body).clone())
-		},
+		&Exp::Lambda(ref pat, ref body) => RunVal::Func(Rc::new(ctx.clone()), pat.clone(), (**body).clone()),
 		&Exp::Invoke(ref target, ref arg) => {
 			match eval_exp(target, ctx) {
 				// TODO proper tuple function evaluation
@@ -236,7 +267,7 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 			let gate = create_extract_gate(cases, ctx);
 			RunVal::State(s.extract(gate), t)
 		},
-		&Exp::Anno(ref exp, ref anno) => eval_type(anno, ctx).unwrap().assign(eval_exp(exp, ctx)).unwrap(),
+		&Exp::Anno(ref exp, ref anno) => eval_type(anno, ctx.types()).unwrap().assign(eval_exp(exp, ctx)).unwrap(),
 	}
 }
 
@@ -264,7 +295,30 @@ pub fn eval_exp_seq(seq: &Vec<Exp>, ctx: &Context) -> Vec<RunVal> {
 	}).collect()
 }
 
-pub fn eval_type(pat: &Pat, ctx: &Context) -> Ret<Type> {
+pub fn infer_type(exp: &Exp, ctx: &TypeContext) -> Ret<Type> {
+	Ok(match exp {
+		&Exp::Index(_) => Type::Any,
+		&Exp::String(_) => Type::Any,
+		&Exp::Var(ref id) => ctx.find_var_type(id)?,
+		&Exp::Scope(ref decls, ref ret) => unimplemented!(),
+		&Exp::Expand(ref arg) => infer_type(arg, ctx)?,
+		&Exp::Tuple(ref args) => Type::Tuple(args.iter().map(|e| infer_type(e, ctx)).collect::<Ret<_>>()?),
+		&Exp::Concat(ref args) => Type::Concat(args.iter().map(|e| infer_type(e, ctx)).collect::<Ret<_>>()?),
+		&Exp::Cond(ref cond_exp, ref then_exp, ref else_exp) => unimplemented!(),
+		&Exp::Lambda(ref pat, ref body) => unimplemented!(),
+		&Exp::Invoke(ref target, ref arg) => unimplemented!(),
+		&Exp::Repeat(n, ref exp) => {
+			let ty = infer_type(exp, ctx)?;
+			Type::Tuple((0..n).map(|_| ty.clone()).collect())
+		},
+		&Exp::State(ref arg) => infer_type(arg, ctx)?,
+		&Exp::Phase(_, ref arg) => infer_type(arg, ctx)?,
+		&Exp::Extract(ref _arg, ref _cases) => unimplemented!(),
+		&Exp::Anno(_, ref anno) => eval_type(anno, ctx)?,
+	})
+}
+
+pub fn eval_type(pat: &Pat, ctx: &TypeContext) -> Ret<Type> {
 	match pat {
 		&Pat::Any => Ok(Type::Any),
 		&Pat::Var(ref id) => ctx.find_type(id),
@@ -288,7 +342,7 @@ pub fn eval_decl(decl: &Decl, ctx: &mut Context) -> Ret {
 	match decl {
 		&Decl::Let(ref pat, ref exp) => assign_pat(pat, &eval_exp(exp, ctx), ctx),
 		&Decl::Type(ref id, ref pat) => {
-			let ty = eval_type(pat, ctx)?;
+			let ty = eval_type(pat, ctx.types())?;
 			ctx.add_type(id.clone(), ty)
 		},
 		&Decl::Data(ref id, ref variants) => ctx.add_datatype(id.clone(), variants.clone()),
@@ -318,7 +372,7 @@ pub fn eval_decl(decl: &Decl, ctx: &mut Context) -> Ret {
 pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Ret {
 	match (pat, val) {
 		(&Pat::Any, _) => Ok(()),
-		(&Pat::Var(ref id), _) => ctx.add_var(id.clone(), val.clone()),
+		(&Pat::Var(ref id), _) => ctx.add_var(id.clone(), val.clone(), Type::Any), // TODO infer type from anno
 		(&Pat::Tuple(ref pats), &RunVal::Tuple(ref vals)) => {
 			if pats.len() != vals.len() {err!("Cannot deconstruct {} values from value: {}", pats.len(), val)}
 			else {
@@ -330,7 +384,7 @@ pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Ret {
 		// (&Pat::Concat(ref pats), val) => {
 		// unimplemented!()
 		// },
-		(&Pat::Anno(ref pat, ref anno), val) => assign_pat(pat, &eval_type(&**anno, ctx)?.assign(val.clone())?, ctx),
+		(&Pat::Anno(ref pat, ref anno), val) => assign_pat(pat, &eval_type(&*anno, ctx.types())?.assign(val.clone())?, ctx),
 		_ => err!("{:?} cannot deconstruct `{}`", pat, val),
 	}
 }
