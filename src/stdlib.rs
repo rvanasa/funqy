@@ -18,6 +18,7 @@ pub fn create_ctx(path: &str) -> Ret<Context> {
 	ctx.add_macro("fourier", &lib_fourier)?;
 	ctx.add_macro("repeat", &lib_repeat)?;
 	ctx.add_macro("measure", &lib_measure)?;
+	ctx.add_macro("typeof", &lib_typeof)?;
 	eval_exp_inline(&parse(r#"
 		data Bool = F | T
 		data Axis = X | Y | Z
@@ -158,4 +159,8 @@ fn lib_repeat(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 fn lib_measure(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 	let (s, t) = build_state_typed(eval_exp(exp, ctx))?;
 	t.assign(RunVal::Index(s.measure()))
+}
+
+fn lib_typeof(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
+	Ok(RunVal::String(format!("{}", ::eval_static::infer_type(exp, ctx.types())?)))
 }

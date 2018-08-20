@@ -11,3 +11,9 @@ do import("examples/Concat")
 
 print "----"
 
+fn qwert = {
+	F => T,
+	T => F,
+}
+
+typeof(qwert)

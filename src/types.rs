@@ -17,6 +17,7 @@ pub enum Type {
 	Data(Rc<DataType>),
 	Tuple(Vec<Type>),
 	Concat(Vec<Type>),
+	Func(Rc<Type>, Rc<Type>),
 }
 
 impl fmt::Display for Type {
@@ -26,6 +27,7 @@ impl fmt::Display for Type {
 			&Type::Data(ref rc) => write!(f, "{}", (*rc).id),
 			&Type::Tuple(ref args) => write!(f, "({})", args.iter().map(|val| format!("{}", val)).collect::<Vec<_>>().join(", ")),
 			&Type::Concat(ref args) => write!(f, "[{}]", args.iter().map(|val| format!("{}", val)).collect::<Vec<_>>().join(", ")),
+			&Type::Func(ref arg, ref ret) => write!(f, "({} -> {})", arg, ret),
 		}
 	}
 }
@@ -47,7 +49,7 @@ impl Type {
 					types.iter().zip(args).map(|(p, a)| p.assign(a.clone())).collect::<Ret<_>>().map(RunVal::Tuple)
 				}
 			},
-			(_, RunVal::Tuple(ref args)) => unimplemented!(), // TODO
+			(_, RunVal::Tuple(ref _args)) => unimplemented!(), // TODO
 			(_, RunVal::Index(n)) => self.from_index(n),
 			(_, RunVal::Data(_, n)) => self.from_index(n),
 			(_, RunVal::State(state, _)) => {
@@ -66,6 +68,7 @@ impl Type {
 			Type::Data(ref dt) => Some((*dt.clone()).variants.len()),
 			Type::Tuple(ref types) => types.iter().map(Type::size).fold(Some(1), |a, b| a.and_then(|a| b.map(|b| a * b))),
 			Type::Concat(ref types) => types.iter().map(Type::size).fold(Some(0), |a, b| a.and_then(|a| b.map(|b| a + b))),
+			Type::Func(_, _) => None,
 		}
 	}
 	
@@ -84,6 +87,7 @@ impl Type {
 				Ok(RunVal::Tuple(vals))
 			},
 			Type::Concat(_) => err!("No index structure {} for type {}", n, self),
+			Type::Func(_, _) => err!("Function {} does not have indexed values", self),
 		}
 	}
 }

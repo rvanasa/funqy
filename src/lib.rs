@@ -16,5 +16,6 @@ pub mod ast;
 pub mod types;
 pub mod engine;
 pub mod eval;
+pub mod eval_static;
 pub mod parser;
 pub mod stdlib;

@@ -2,6 +2,7 @@ use error::*;
 use ast::*;
 use engine::*;
 use types::*;
+use eval_static::*;
 
 use std::fmt;
 use std::rc::Rc;
@@ -31,7 +32,7 @@ pub enum RunVal {
 	String(String),
 	Data(Rc<DataType>, usize),
 	Tuple(Vec<RunVal>),
-	Func(Rc<Context>, Pat, Exp),
+	Func(Rc<Context>, Pat, Exp, Type),
 	Macro(Macro),
 	State(State, Type),
 	Gate(Gate),
@@ -44,7 +45,7 @@ impl fmt::Display for RunVal {
 			&RunVal::String(ref s) => write!(f, "{:?}", s),
 			&RunVal::Data(ref dt, ref index) => write!(f, "{}", dt.variants[*index]),
 			&RunVal::Tuple(ref vals) => write!(f, "({})", vals.iter().map(|val| format!("{}", val)).collect::<Vec<_>>().join(", ")),
-			&RunVal::Func(ref _ctx, ref _pat, ref _body) => write!(f, "(..) -> (..)"),
+			&RunVal::Func(ref _ctx, ref _pat, ref _body, ref ty) => write!(f, "[{}]", ty),
 			&RunVal::Macro(ref mc) => write!(f, "{:?}", mc),
 			&RunVal::State(ref state, ref ty) => if ty != &Type::Any {
 				write!(f, "{}: {}", StateView(state), ty)
@@ -83,7 +84,7 @@ impl Context {
 	}
 	
 	pub fn find_var(&self, id: &Ident) -> Ret<RunVal> {
-		find("Variable", id, self.vars.get(id))
+		unwrap_from_context("Variable", id, self.vars.get(id))
 	}
 	
 	pub fn add_var(&mut self, id: Ident, val: RunVal, ty: Type) -> Ret {
@@ -138,45 +139,10 @@ impl Context {
 }
 
 #[derive(Clone,Debug,PartialEq)]
-pub struct TypeContext {
-	types: HashMap<Ident, Type>,
-}
-
-impl TypeContext {
-	pub fn new() -> TypeContext {
-		TypeContext {
-			types: HashMap::new(),
-		}
-	}
-	
-	pub fn add_type(&mut self, id: Ident, ty: Type) -> Ret {
-		self.types.insert(id, ty);
-		Ok(())
-	}
-	
-	pub fn find_type(&self, id: &Ident) -> Ret<Type> {
-		find("Type", id, self.types.get(id))
-	}
-	
-	pub fn add_var_type(&mut self, id: Ident, ty: Type) -> Ret {
-		self.types.insert(format!("@{}", id), ty);
-		Ok(())
-	}
-	
-	pub fn find_var_type(&self, id: &Ident) -> Ret<Type> {
-		find("Variable type", id, self.types.get(&format!("@{}", id)))
-	}
-}
-
-#[derive(Clone,Debug,PartialEq)]
 pub struct Module {
 	pub path: String,
 	pub exp: Exp,
 	pub ctx: Context,
-}
-
-fn find<T:Clone>(cat: &str, id: &Ident, opt: Option<&T>) -> Ret<T> {
-	opt.map(|t| t.clone()).ok_or_else(|| Error(format!("{} not found in scope: `{}`", cat, id)))
 }
 
 pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
@@ -223,11 +189,14 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 				]), Type::Any /* TODO determine from then/else types */)
 			}
 		},
-		&Exp::Lambda(ref pat, ref body) => RunVal::Func(Rc::new(ctx.clone()), pat.clone(), (**body).clone()),
+		&Exp::Lambda(ref pat, ref body) => {
+			let ty = infer_type(exp, ctx.types()).unwrap();
+			RunVal::Func(Rc::new(ctx.clone()), pat.clone(), (**body).clone(), ty)
+		},
 		&Exp::Invoke(ref target, ref arg) => {
 			match eval_exp(target, ctx) {
 				// TODO proper tuple function evaluation
-				RunVal::Func(fn_ctx_rc, pat, body) => {
+				RunVal::Func(fn_ctx_rc, pat, body, _ty) => {
 					let mut fn_ctx = (*fn_ctx_rc).clone();
 					assign_pat(&pat, &eval_exp(arg, ctx), &mut fn_ctx).unwrap();
 					eval_exp(&body, &fn_ctx)
@@ -246,7 +215,7 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 			}
 		},
 		&Exp::Repeat(n, ref exp) => {
-			let val = eval_exp(&*exp, ctx);
+			let val = eval_exp(&exp, ctx);
 			RunVal::Tuple((0..n).map(|_| val.clone()).collect())
 		},
 		&Exp::State(ref arg) => {
@@ -295,49 +264,6 @@ pub fn eval_exp_seq(seq: &Vec<Exp>, ctx: &Context) -> Vec<RunVal> {
 	}).collect()
 }
 
-pub fn infer_type(exp: &Exp, ctx: &TypeContext) -> Ret<Type> {
-	Ok(match exp {
-		&Exp::Index(_) => Type::Any,
-		&Exp::String(_) => Type::Any,
-		&Exp::Var(ref id) => ctx.find_var_type(id)?,
-		&Exp::Scope(ref decls, ref ret) => unimplemented!(),
-		&Exp::Expand(ref arg) => infer_type(arg, ctx)?,
-		&Exp::Tuple(ref args) => Type::Tuple(args.iter().map(|e| infer_type(e, ctx)).collect::<Ret<_>>()?),
-		&Exp::Concat(ref args) => Type::Concat(args.iter().map(|e| infer_type(e, ctx)).collect::<Ret<_>>()?),
-		&Exp::Cond(ref cond_exp, ref then_exp, ref else_exp) => unimplemented!(),
-		&Exp::Lambda(ref pat, ref body) => unimplemented!(),
-		&Exp::Invoke(ref target, ref arg) => unimplemented!(),
-		&Exp::Repeat(n, ref exp) => {
-			let ty = infer_type(exp, ctx)?;
-			Type::Tuple((0..n).map(|_| ty.clone()).collect())
-		},
-		&Exp::State(ref arg) => infer_type(arg, ctx)?,
-		&Exp::Phase(_, ref arg) => infer_type(arg, ctx)?,
-		&Exp::Extract(ref _arg, ref _cases) => unimplemented!(),
-		&Exp::Anno(_, ref anno) => eval_type(anno, ctx)?,
-	})
-}
-
-pub fn eval_type(pat: &Pat, ctx: &TypeContext) -> Ret<Type> {
-	match pat {
-		&Pat::Any => Ok(Type::Any),
-		&Pat::Var(ref id) => ctx.find_type(id),
-		&Pat::Tuple(ref args) => args.iter()
-			.map(|p| eval_type(p, ctx))
-			.collect::<Ret<_>>()
-			.map(Type::Tuple),
-		&Pat::Concat(ref args) => args.iter()
-			.map(|p| eval_type(p, ctx))
-			.collect::<Ret<_>>()
-			.map(Type::Concat),
-		&Pat::Anno(_, _) => Err(Error(format!("Annotations not allowed in types"))),
-		&Pat::Repeat(n, ref pat) => {
-			let ty = eval_type(&*pat, ctx);
-			(0..n).map(|_| ty.clone()).collect::<Ret<_>>().map(Type::Tuple)
-		},
-	}
-}
-
 pub fn eval_decl(decl: &Decl, ctx: &mut Context) -> Ret {
 	match decl {
 		&Decl::Let(ref pat, ref exp) => assign_pat(pat, &eval_exp(exp, ctx), ctx),
@@ -369,10 +295,11 @@ pub fn eval_decl(decl: &Decl, ctx: &mut Context) -> Ret {
 	}
 }
 
+// TODO combine logic with eval_static::assign_pat_type()
 pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Ret {
 	match (pat, val) {
 		(&Pat::Any, _) => Ok(()),
-		(&Pat::Var(ref id), _) => ctx.add_var(id.clone(), val.clone(), Type::Any), // TODO infer type from anno
+		(&Pat::Var(ref id), _) => ctx.add_var(id.clone(), val.clone(), get_val_type(val)), //TODO use val type
 		(&Pat::Tuple(ref pats), &RunVal::Tuple(ref vals)) => {
 			if pats.len() != vals.len() {err!("Cannot deconstruct {} values from value: {}", pats.len(), val)}
 			else {
@@ -381,11 +308,21 @@ pub fn assign_pat(pat: &Pat, val: &RunVal, ctx: &mut Context) -> Ret {
 					.collect::<Ret<_>>()
 			}
 		},
-		// (&Pat::Concat(ref pats), val) => {
-		// unimplemented!()
-		// },
-		(&Pat::Anno(ref pat, ref anno), val) => assign_pat(pat, &eval_type(&*anno, ctx.types())?.assign(val.clone())?, ctx),
+		(&Pat::Anno(ref pat, ref anno), _) => assign_pat(pat, &eval_type(&anno, ctx.types())?.assign(val.clone())?, ctx),
 		_ => err!("{:?} cannot deconstruct `{}`", pat, val),
+	}
+}
+
+pub fn get_val_type(val: &RunVal) -> Type {
+	match val {
+		&RunVal::Index(_) => Type::Any,
+		&RunVal::String(_) => Type::Any,
+		&RunVal::Data(ref dt, _) => Type::Data((*dt).clone()),
+		&RunVal::Tuple(ref vals) => Type::Tuple(vals.iter().map(get_val_type).collect()),
+		&RunVal::Func(_, _, _, ref ty) => ty.clone(),
+		&RunVal::Macro(_) => Type::Any, // TODO
+		&RunVal::State(_, ref ty) => ty.clone(),
+		&RunVal::Gate(_) => Type::Any, // TODO
 	}
 }
 
@@ -427,7 +364,7 @@ pub fn build_gate(val: &RunVal, ctx: &Context) -> Option<Gate> {
 		&RunVal::Tuple(ref vals) => vals.iter()
 			.fold(Some(vec![get_state(0)]), 
 				|a, b| a.and_then(|a| build_gate(b, ctx).map(|b| a.combine(b)))),
-		&RunVal::Func(ref fn_ctx, ref _pat, ref body) => eval_gate_body(body, fn_ctx),
+		&RunVal::Func(ref fn_ctx, ref _pat, ref body, ref _ty) => eval_gate_body(body, fn_ctx), // TODO pass type
 		&RunVal::Gate(ref gate) => Some(gate.clone()),
 		_ => None,
 	}
