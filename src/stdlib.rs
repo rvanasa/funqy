@@ -22,6 +22,7 @@ pub fn create_ctx(path: &str) -> Ret<Context> {
 	eval_exp_inline(&parse(r#"
 		data Bool = F | T
 		data Axis = X | Y | Z
+		
 		let ((^), (~), (#)) = (sup, phf, measure)
 		fn identity(a) = a
 		fn (>>)(x, f) = f(x)
@@ -29,6 +30,32 @@ pub fn create_ctx(path: &str) -> Ret<Context> {
 		fn (>.)(f, g)(a) = g(f(a))
 		fn (<.)(f, g)(a) = f(g(a))
 		fn (..)(r)(s) = slice(s, r)
+		
+		fn ident {
+			F => F,
+			T => T,
+		}
+		fn px {
+			F => T,
+			T => F,
+		}
+		fn py {
+			F => @[1/2] T,
+			T => @[-1/2] F,
+		}
+		fn pz {
+			F => F,
+			T => ~T,
+		}
+		fn had {
+			F => F ^ T,
+			T => F ^ ~T,
+		}
+		fn ctrl(g)(c: Bool, x: Bool) = (c, extract c {
+			F => x,
+			T => g(x),
+		})
+		let cnot = ctrl(px)
 	"#.to_string())?, &mut ctx);
 	Ok(ctx)
 }

@@ -1,5 +1,5 @@
 use error::*;
-use eval::RunVal;
+use eval::{self, RunVal};
 use ast::*;
 
 use std::fmt;
@@ -49,7 +49,13 @@ impl Type {
 					types.iter().zip(args).map(|(p, a)| p.assign(a.clone())).collect::<Ret<_>>().map(RunVal::Tuple)
 				}
 			},
-			(_, RunVal::Tuple(ref _args)) => unimplemented!(), // TODO
+			(Type::Concat(ref types), ref val) => {
+				if types.len() == 1 {
+					// TODO remove clone()
+					Ok(RunVal::State(eval::build_state(val.clone()), types[0].clone()))
+				}
+				else {unimplemented!()} // TODO
+			},
 			(_, RunVal::Index(n)) => self.from_index(n),
 			(_, RunVal::Data(_, n)) => self.from_index(n),
 			(_, RunVal::State(state, _)) => {

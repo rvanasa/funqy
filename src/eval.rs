@@ -45,7 +45,7 @@ impl fmt::Display for RunVal {
 			&RunVal::String(ref s) => write!(f, "{:?}", s),
 			&RunVal::Data(ref dt, ref index) => write!(f, "{}", dt.variants[*index]),
 			&RunVal::Tuple(ref vals) => write!(f, "({})", vals.iter().map(|val| format!("{}", val)).collect::<Vec<_>>().join(", ")),
-			&RunVal::Func(ref _ctx, ref _pat, ref _body, ref ty) => write!(f, "[{}]", ty),
+			&RunVal::Func(ref _ctx, ref _pat, ref _body, ref ty) => write!(f, "fn{}", ty),
 			&RunVal::Macro(ref mc) => write!(f, "{:?}", mc),
 			&RunVal::State(ref state, ref ty) => if ty != &Type::Any {
 				write!(f, "{}: {}", StateView(state), ty)
@@ -160,7 +160,12 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 		&Exp::Expand(_) => panic!("No context for expansion"),
 		&Exp::Tuple(ref args) => RunVal::Tuple(eval_exp_seq(args, ctx)),
 		&Exp::Concat(ref args) => {
-			//TODO gates
+			//TODO adjacent gates
+			if args.len() == 1 {
+				if let Some(gate) = build_gate(&eval_exp(&args[0], ctx), ctx) {
+					return RunVal::Gate(gate)
+				}
+			}
 			let div = (args.len() as f32).sqrt();
 			let states = args.iter()
 				.map(|e| build_state_typed(eval_exp(e, ctx)))
@@ -364,7 +369,7 @@ pub fn build_gate(val: &RunVal, ctx: &Context) -> Option<Gate> {
 		&RunVal::Tuple(ref vals) => vals.iter()
 			.fold(Some(vec![get_state(0)]), 
 				|a, b| a.and_then(|a| build_gate(b, ctx).map(|b| a.combine(b)))),
-		&RunVal::Func(ref fn_ctx, ref _pat, ref body, ref _ty) => eval_gate_body(body, fn_ctx), // TODO pass type
+		&RunVal::Func(ref fn_ctx, ref _pat, ref body, ref _ty) => eval_gate_body(body, fn_ctx), // TODO use type
 		&RunVal::Gate(ref gate) => Some(gate.clone()),
 		_ => None,
 	}
@@ -383,7 +388,10 @@ pub fn create_extract_gate(cases: &Vec<Case>, ctx: &Context) -> Gate {
 				for (i, s) in selector_state.iter().enumerate() {
 					let len = ::std::cmp::max(result_state.len(), dims[i].len());
 					// TODO improve impl
-					dims[i] = result_state.clone().pad(len).into_iter().zip(dims[i].clone().pad(len).into_iter()).map(|(r, d)| r * s + d).collect();
+					dims[i] = result_state.clone().pad(len).into_iter()
+						.zip(dims[i].clone().pad(len).into_iter())
+						.map(|(r, d)| r * s + d)
+						.collect();
 				}
 			},
 			&Case::Default(ref result) => {

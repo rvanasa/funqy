@@ -1,0 +1,14 @@
+// Describe gate operations performed on a 3-qubit quantum register
+
+type Reg = (Bool, Bool, Bool)
+
+fn superdense(reg: [Reg]): [Reg] = reg
+	>> (had, had, had)
+	>> (px, py, pz)
+	// >> (cnot, ident)
+	// >> (ident, cnot)
+	// >> \(a, b, c) -> (c, a, b)
+	// >> (cnot, ident)
+	>> (ident, had, had)
+
+print superdense(F, F, F) 

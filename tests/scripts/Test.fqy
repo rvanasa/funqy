@@ -7,13 +7,13 @@ do import("examples/TangleTree")
 do import("examples/ExpandRepeat")
 do import("examples/Quaternion")
 do import("examples/Concat")
+do import("examples/Register")
 // do import("examples/EPR")
 
 print "----"
 
-fn qwert = {
+fn f = {
 	F => T,
 	T => F,
 }
-
-typeof(qwert)
+typeof(f)

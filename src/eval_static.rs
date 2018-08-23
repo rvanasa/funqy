@@ -87,9 +87,9 @@ pub fn infer_type(exp: &Exp, ctx: &TypeContext) -> Ret<Type> {
 		&Exp::Expand(ref arg) => infer_type(arg, ctx)?,
 		&Exp::Tuple(ref args) => Type::Tuple(args.iter().map(|e| infer_type(e, ctx)).collect::<Ret<_>>()?),
 		&Exp::Concat(ref args) => Type::Concat(args.iter().map(|e| infer_type(e, ctx)).collect::<Ret<_>>()?),
-		&Exp::Cond(ref cond_exp, ref then_exp, ref else_exp) => either_type(infer_type(then_exp, ctx)?, infer_type(else_exp, ctx)?),
+		&Exp::Cond(_, ref then_exp, ref else_exp) => either_type(infer_type(then_exp, ctx)?, infer_type(else_exp, ctx)?),
 		&Exp::Lambda(ref pat, ref body) => {
-			// TODO type inference instead of special cases
+			// TODO type inference logic instead of special cases
 			let ty = match (pat, &**body) {
 				(&Pat::Var(ref id), &Exp::Extract(ref rc, ref cases)) if Exp::Var(id.clone()) == **rc =>
 					infer_extract_arg_type(cases, ctx)?,
