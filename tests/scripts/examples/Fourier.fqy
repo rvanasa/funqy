@@ -1,4 +1,4 @@
-// Quantun Fourier Transform example using a predefined data set
+// Quantum Fourier Transform example using a predefined data set
 
 let state = sup(2, 5, 9, 11) >> ..16
 

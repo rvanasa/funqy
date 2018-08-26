@@ -49,7 +49,9 @@ impl fmt::Display for RunVal {
 			&RunVal::Macro(ref mc) => write!(f, "{:?}", mc),
 			&RunVal::State(ref state, ref ty) => if ty != &Type::Any {
 				write!(f, "{}: {}", StateView(state), ty)
-			} else {write!(f, "{}", StateView(state))},
+			} else {
+				write!(f, "{}", StateView(state))
+			},
 			&RunVal::Gate(ref gate) => write!(f, "[{}]", gate.iter().map(|state| format!("{}", StateView(state))).collect::<Vec<_>>().join(", ")),
 		}
 	}
