@@ -20,7 +20,6 @@ let m1 = box1_m
 let m2 = measure(box2): Bool
 
 // Result: `outer1` and `outer2` do not necessarily agree (breaking the reality described by quantum theory)
-
 print r
 print (box1, box2)
 print (m1, m2)
