@@ -9,7 +9,7 @@ let box1 = if r then F else F ^ T
 // Measured state of `box1` after measurement
 let box1_m = measure(box1): Bool
 
-// Probability space of `box2` according to `outer2`
+// Probability space of `box2` according to `box1_m`
 // This step encodes the "knowledge of quantum mechanics"
 let box2 = if box1_m then F else F ^ T
 
@@ -19,7 +19,7 @@ let m1 = box1_m
 // External measurement of `box2`
 let m2 = measure(box2): Bool
 
-// Result: `outer1` and `outer2` do not necessarily agree (breaking the reality described by quantum theory)
+// Result: `m1` and `m2` do not necessarily agree (breaking the reality described by quantum theory)
 print r
 print (box1, box2)
 print (m1, m2)
