@@ -13,5 +13,8 @@ data Location =
 
 let chances: Location = weighted(1, 4, 2, 4, 4, 2, 0, 1)
 
+// Show probability distribution
+print chances
+
 // Randomly select location
 measure(chances)

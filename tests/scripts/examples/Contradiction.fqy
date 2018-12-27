@@ -1,25 +1,28 @@
 // Demonstration of the contradiction described in https://www.nature.com/articles/s41467-018-05739-8
 
+// Coin probability
+let coin = F ^ T
+
 // Coin flip result
-let r = measure(F ^ T): Bool
+let r: Bool = measure(coin)
 
 // Hidden state constructed in `box1`
-let box1 = if r then F else F ^ T
+let box1 = if r then F ^ T else F 
 
 // Measured state of `box1` after measurement
-let box1_m = measure(box1): Bool
+let box1_m: Bool = measure(box1)
 
-// Probability space of `box2` according to `outer2`
+// Probability space of `box2` depending on `coin` and `box1_m`
 // This step encodes the "knowledge of quantum mechanics"
-let box2 = if box1_m then F else F ^ T
+let box2 = if coin then box1_m else F
 
 // External measurement of `box1`
 let m1 = box1_m
 
 // External measurement of `box2`
-let m2 = measure(box2): Bool
+let m2: Bool = measure(box2)
 
-// Result: `outer1` and `outer2` do not necessarily agree (breaking the reality described by quantum theory)
+// Result: `m1` and `m2` do not necessarily agree (breaking the reality described by quantum theory)
 print r
 print (box1, box2)
 print (m1, m2)
