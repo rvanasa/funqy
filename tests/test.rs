@@ -1,5 +1,5 @@
 extern crate funqy;
-use funqy::stdlib::*;
+use funqy::*;
 
 #[test]
 fn test_parser() {

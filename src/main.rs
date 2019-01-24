@@ -1,5 +1,3 @@
-#![feature(fs_read_write)]
-
 #[macro_use]
 extern crate clap;
 extern crate rustyline;

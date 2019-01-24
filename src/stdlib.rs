@@ -121,7 +121,7 @@ fn lib_slice(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 		}
 	}
 	match exp {
-		&Exp::Tuple(ref args) if args.len() == 2 => {
+		Exp::Tuple(ref args) if args.len() == 2 => {
 			let state = build_state(eval_exp(&args[0], ctx));
 			let (a, b) = to_slice_params(eval_exp(&args[1], ctx))?;
 			Ok(RunVal::State(state.into_iter().chain(::std::iter::repeat(::num::Zero::zero())).skip(a).take(b - a).collect(), Type::Any))
@@ -132,7 +132,7 @@ fn lib_slice(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 
 fn lib_weighted(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 	match exp {
-		&Exp::Tuple(ref args) => {
+		Exp::Tuple(ref args) => {
 			let weights: State = args.iter().map(|arg| {
 				let val = eval_exp(arg, ctx);
 				if let RunVal::Index(n) = val {Ok(Cf32::new(n as f32, 0_f32))}

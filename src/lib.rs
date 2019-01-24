@@ -1,5 +1,3 @@
-#![feature(fs_read_write)]
-
 extern crate rand;
 extern crate regex;
 extern crate reqwest;
@@ -19,3 +17,5 @@ pub mod eval;
 pub mod eval_static;
 pub mod parser;
 pub mod stdlib;
+
+pub use stdlib::create_ctx;
