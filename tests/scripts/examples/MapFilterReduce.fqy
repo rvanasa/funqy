@@ -1,6 +1,13 @@
 let list = (3, 2, 1, 0, 1, 2, 3)
+
+
 let filtered = list
     >> filter(\n -> n)
     >> map(\n -> (n, n))
 
 assert filtered == ((3,3),(2,2),(1,1),(1,1),(2,2),(3,3))
+
+
+let folded = fold((), list, \(xs, x) -> (x, ...xs, x))
+
+assert folded == (...list, ...list)
