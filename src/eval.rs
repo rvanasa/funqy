@@ -264,7 +264,7 @@ pub fn eval_exp_seq(seq: &Vec<Exp>, ctx: &Context) -> Vec<RunVal> {
 		if let Exp::Expand(ref e) = e {
 			match eval_exp(e, ctx) {
 				RunVal::Tuple(args) => args,
-				_ => panic!("Cannot expand value")
+				val => panic!("Cannot expand value: {}", val),
 			}
 		}
 		else {vec![eval_exp(e, ctx)]}
@@ -374,6 +374,16 @@ pub fn build_gate(val: &RunVal, ctx: &Context) -> Option<Gate> {
 		&RunVal::Func(ref fn_ctx, ref _pat, ref body, ref _ty) => eval_gate_body(body, fn_ctx), // TODO use type
 		&RunVal::Gate(ref gate) => Some(gate.clone()),
 		_ => None,
+	}
+}
+
+pub fn iterate_val(val: RunVal) -> Ret<Vec<RunVal>> {
+	match val {
+		RunVal::Index(i) => {
+			Ok((0..i).map(RunVal::Index).collect())
+		},
+		RunVal::Tuple(vals) => Ok(vals),
+		_ => err!("Cannot iterate {}", val),
 	}
 }
 

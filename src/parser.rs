@@ -227,6 +227,13 @@ named!(arg_exp<Exp>, alt!(
 	// map!(opr_ident, Exp::Var)
 ));
 
+//named!(loop_exp<Exp>, preceded!(ws!(tag!("for")), do_parse!(
+//	pat_val: alt!(tuple!(pat, preceded!(ws!(tag!("in")), exp)) | tuple!(value!(Pat::Any), exp)) >>
+//	filter: opt!(preceded!(ws!(tag!("where")), exp)) >>
+//	body: block_exp >>
+//	(Exp::Loop(pat_val.0, Rc::new(pat_val.1), filter.map(Rc::new), Rc::new(body)))
+//)));
+
 named!(prefix_opr_exp<Exp>, do_parse!(
 	opr: opr_ident >>
 	exp: target_exp >>
@@ -234,7 +241,7 @@ named!(prefix_opr_exp<Exp>, do_parse!(
 ));
 
 named!(target_exp<Exp>,
-	alt!(phase_exp | prefix_opr_exp | cond_exp | anno_exp | lambda_exp)
+	alt!(phase_exp | prefix_opr_exp | cond_exp | anno_exp/* | loop_exp*/ | lambda_exp)
 );
 
 named!(exp<Exp>, do_parse!(

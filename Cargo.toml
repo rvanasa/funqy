@@ -8,8 +8,8 @@ rand = "^0.4.2"
 regex = "1.0"
 reqwest = "0.8"
 num = "^0.2"
-lapacke = "0.2.0"
-openblas-src = { version = "0.6.0", features = ["static"] }
+#lapacke = "0.2.0"
+#openblas-src = { version = "0.6.0", features = ["static"] }
 nom = "3.2.1"
 clap = "^2.31"
 rustyline = "1.0"

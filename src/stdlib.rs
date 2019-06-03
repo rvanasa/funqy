@@ -17,6 +17,7 @@ pub fn create_ctx(path: &str) -> Ret<Context> {
 	ctx.add_macro("weighted", &lib_weighted)?;
 	ctx.add_macro("fourier", &lib_fourier)?;
 	ctx.add_macro("repeat", &lib_repeat)?;
+	ctx.add_macro("fold", &lib_fold)?;
 	ctx.add_macro("measure", &lib_measure)?;
 	ctx.add_macro("typeof", &lib_typeof)?;
 	eval_exp_inline(&parse(r#"
@@ -30,6 +31,9 @@ pub fn create_ctx(path: &str) -> Ret<Context> {
 		fn (>.)(f, g)(a) = g(f(a))
 		fn (<.)(f, g)(a) = f(g(a))
 		fn (..)(r)(s) = slice(s, r)
+		
+		fn map(fn)(iter) = fold((), iter, \(xs, x) -> (...xs, fn(x)))
+		fn filter(fn)(iter) = fold((), iter, \(xs, x) -> if fn(x) then (...xs, x) else xs)
 		
 		fn ident {
 			F => F,
@@ -180,6 +184,29 @@ fn lib_repeat(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 			}
 		},
 		_ => err!("Invalid `repeat` arguments"),
+	}
+}
+
+fn lib_fold(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
+	match exp {
+		&Exp::Tuple(ref args) if args.len() == 3 => {
+			let mut current = eval_exp(&args[0], ctx);
+			let input = eval_exp(&args[1], ctx);
+			let func = eval_exp(&args[2], ctx);
+			if let RunVal::Func(fn_ctx_rc, pat, body, _ty) = func {
+				let list = iterate_val(input)?;
+				for val in list {
+					let mut fn_ctx = (*fn_ctx_rc).clone();
+					assign_pat(&pat, &RunVal::Tuple(vec![current, val]), &mut fn_ctx)?;
+					current = eval_exp(&body, &fn_ctx);
+				}
+				Ok(current)
+			}
+			else {
+				err!("Invalid `fold` function")
+			}
+		},
+		_ => err!("Invalid `fold` arguments"),
 	}
 }
 

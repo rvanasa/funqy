@@ -189,55 +189,62 @@ impl MatrixLike for Gate {
 	}
 	
 	fn power(self, p: Phase) -> Self {
-		use lapacke::*;
-		use num::Zero;
 		use num::One;
 		if p.is_one() {
 			return self
 		}
 		
-		let size = ::std::cmp::max(self.len(), self.width());
-		let mut mat = vec![c64::zero(); size * size];
-		for (i, s) in self.into_iter().enumerate() {
-			for (j, n) in s.into_iter().enumerate() {
-				mat[i * size + j] = c64::new(n.re as f64, n.im as f64);
-			}
-		}
+		panic!("Power function not implemented")
 		
-		let mut vals = vec![c64::zero(); size];
-		let mut vecs = vec![c64::zero(); size * size];
-		// let mut ivecs: Vec<c64>;
-		unsafe {
-			fn wrap_status(status: i32) {
-				if status != 0 {
-					panic!(status)
-				}
-			}
-			// let mut pivots = vec![0; size];
-			let size = size as i32;
-			wrap_status(zgeev(Layout::RowMajor, b'N', b'V', size, &mut mat[..], size, &mut vals[..], &mut [], size, &mut vecs[..], size));
-			// ivecs = vecs.clone();
-			// wrap_status(zgetrf(Layout::RowMajor, size, size, &mut ivecs, size, &mut pivots));
-			// wrap_status(zgetri(Layout::RowMajor, size, &mut ivecs, size, &pivots[..]));
-		}
-		
-		fn to_state(v: Vec<c64>) -> State {
-			v.into_iter().map(|c| Cf32::new(c.re as f32, c.im as f32)).collect()
-		}
-		fn to_gate(v: Vec<c64>, n: usize) -> Gate {
-			(0..n).map(|i| to_state(v[n * i .. n * (i + 1)].to_vec())).collect()
-		}
-		let vals = to_state(vals);
-		let vecs = to_gate(vecs, size);
-		// let ivecs = to_gate(ivecs, size);
-		let ivecs = vecs.clone().inverse();
-		
-		let diag = (0..size).map(|i| {
-			let mut vec = vec![real!(0); size];
-			vec[i] = vals[i].powc(p);
-			vec
-		}).collect();
-		ivecs.extract(diag).extract(vecs)
+//		use lapacke::*;
+//		use num::Zero;
+//		use num::One;
+//		if p.is_one() {
+//			return self
+//		}
+//		
+//		let size = ::std::cmp::max(self.len(), self.width());
+//		let mut mat = vec![c64::zero(); size * size];
+//		for (i, s) in self.into_iter().enumerate() {
+//			for (j, n) in s.into_iter().enumerate() {
+//				mat[i * size + j] = c64::new(n.re as f64, n.im as f64);
+//			}
+//		}
+//		
+//		let mut vals = vec![c64::zero(); size];
+//		let mut vecs = vec![c64::zero(); size * size];
+//		// let mut ivecs: Vec<c64>;
+//		unsafe {
+//			fn wrap_status(status: i32) {
+//				if status != 0 {
+//					panic!(status)
+//				}
+//			}
+//			// let mut pivots = vec![0; size];
+//			let size = size as i32;
+//			wrap_status(zgeev(Layout::RowMajor, b'N', b'V', size, &mut mat[..], size, &mut vals[..], &mut [], size, &mut vecs[..], size));
+//			// ivecs = vecs.clone();
+//			// wrap_status(zgetrf(Layout::RowMajor, size, size, &mut ivecs, size, &mut pivots));
+//			// wrap_status(zgetri(Layout::RowMajor, size, &mut ivecs, size, &pivots[..]));
+//		}
+//		
+//		fn to_state(v: Vec<c64>) -> State {
+//			v.into_iter().map(|c| Cf32::new(c.re as f32, c.im as f32)).collect()
+//		}
+//		fn to_gate(v: Vec<c64>, n: usize) -> Gate {
+//			(0..n).map(|i| to_state(v[n * i .. n * (i + 1)].to_vec())).collect()
+//		}
+//		let vals = to_state(vals);
+//		let vecs = to_gate(vecs, size);
+//		// let ivecs = to_gate(ivecs, size);
+//		let ivecs = vecs.clone().inverse();
+//		
+//		let diag = (0..size).map(|i| {
+//			let mut vec = vec![real!(0); size];
+//			vec[i] = vals[i].powc(p);
+//			vec
+//		}).collect();
+//		ivecs.extract(diag).extract(vecs)
 	}
 }
 

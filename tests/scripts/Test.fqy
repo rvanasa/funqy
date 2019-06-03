@@ -8,6 +8,7 @@ do import("examples/ExpandRepeat")
 do import("examples/Quaternion")
 do import("examples/Concat")
 do import("examples/Register")
+do import("examples/MapFilterReduce")
 // do import("examples/EPR")
 
 print "----"
