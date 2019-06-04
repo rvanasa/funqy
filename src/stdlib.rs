@@ -32,8 +32,8 @@ pub fn create_ctx(path: &str) -> Ret<Context> {
 		fn (<.)(f, g)(a) = f(g(a))
 		fn (..)(r)(s) = slice(s, r)
 		
-		fn map(fn)(iter) = fold((), iter, \(xs, x) -> (...xs, fn(x)))
-		fn filter(fn)(iter) = fold((), iter, \(xs, x) -> if fn(x) then (...xs, x) else xs)
+		fn map(f)(iter) = fold((), iter, \(xs, x) -> (...xs, f(x)))
+		fn filter(f)(iter) = fold((), iter, \(xs, x) -> if f(x) then (...xs, x) else xs)
 		
 		fn ident {
 			F => F,
@@ -194,7 +194,8 @@ fn lib_fold(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 			let input = eval_exp(&args[1], ctx);
 			let func = eval_exp(&args[2], ctx);
 			if let RunVal::Func(fn_ctx_rc, pat, body, _ty) = func {
-				let list = iterate_val(input)?;
+				let err = Error(format!("Cannot iterate {}", input));
+				let list = iterate_val(input).ok_or(err)?;
 				for val in list {
 					let mut fn_ctx = (*fn_ctx_rc).clone();
 					assign_pat(&pat, &RunVal::Tuple(vec![current, val]), &mut fn_ctx)?;

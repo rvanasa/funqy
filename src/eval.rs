@@ -67,17 +67,17 @@ pub struct Context {
 impl Context {
 	pub fn new(path: String) -> Context {
 		Context {
-			path: path,
+			path,
 			vars: HashMap::new(),
 			types: TypeContext::new(),
 		}
 	}
 	
-	pub fn path<'a>(&'a self) -> &'a String {
+	pub fn path(&self) -> &String {
 		&self.path
 	}
 	
-	pub fn types<'a>(&'a self) -> &'a TypeContext {
+	pub fn types(&self) -> &TypeContext {
 		&self.types
 	}
 	
@@ -186,14 +186,16 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 				eval_exp(if b {then_exp} else {else_exp}, ctx)
 			}
 			else {
-				let state = build_state(val);
-				if state.len() > 2 {
-					panic!("Conditional state cannot be {}-dimensional", state.len())
-				}
-				RunVal::State(state.extract(vec![
-					build_state(eval_exp(else_exp, ctx)),
-					build_state(eval_exp(then_exp, ctx)),
-				]), Type::Any /* TODO determine from then/else types */)
+				// TODO: consider removing in favor of using extract gates for explicitness
+//				let state = build_state(val);
+//				if state.len() > 2 {
+//					panic!("Conditional state cannot be {}-dimensional", state.len())
+//				}
+//				RunVal::State(state.extract(vec![
+//					build_state(eval_exp(else_exp, ctx)),
+//					build_state(eval_exp(then_exp, ctx)),
+//				]), Type::Any /* TODO determine from then/else types */)
+                panic!("Non-boolean value: {}", val)
 			}
 		},
 		&Exp::Lambda(ref pat, ref body) => {
@@ -239,9 +241,9 @@ pub fn eval_exp(exp: &Exp, ctx: &Context) -> RunVal {
 				})
 		},
 		&Exp::Extract(ref arg, ref cases) => {
-			let (s, t) = build_state_typed(eval_exp(arg, ctx)).unwrap();
-			let gate = create_extract_gate(cases, ctx);
-			RunVal::State(s.extract(gate), t)
+            let state = build_state(eval_exp(arg, ctx));
+            let (gate, gt) = create_extract_gate_typed(cases, state.len(), ctx);
+            RunVal::State(state.extract(gate), gt)
 		},
 		&Exp::Anno(ref exp, ref anno) => eval_type(anno, ctx.types()).unwrap().assign(eval_exp(exp, ctx)).unwrap(),
 	}
@@ -262,10 +264,9 @@ pub fn eval_exp_inline(exp: &Exp, ctx: &mut Context) -> RunVal {
 pub fn eval_exp_seq(seq: &Vec<Exp>, ctx: &Context) -> Vec<RunVal> {
 	seq.iter().flat_map(|e| {
 		if let Exp::Expand(ref e) = e {
-			match eval_exp(e, ctx) {
-				RunVal::Tuple(args) => args,
-				val => panic!("Cannot expand value: {}", val),
-			}
+            let val = eval_exp(e, ctx);
+            let err = Error(format!("Cannot expand value: {}", val));
+            iterate_val(val).ok_or(err).unwrap()
 		}
 		else {vec![eval_exp(e, ctx)]}
 	}).collect()
@@ -336,6 +337,7 @@ pub fn get_val_type(val: &RunVal) -> Type {
 pub fn build_bool(val: &RunVal) -> Option<bool> {
 	match val {
 		&RunVal::Index(n) => Some(n > 0),
+        &RunVal::Data(ref _ty, n) => Some(n > 0),
 		&RunVal::Tuple(ref vec) => Some(vec.len() > 0),
 		_ => None,
 	}
@@ -361,7 +363,7 @@ pub fn build_state_typed(val: RunVal) -> Ret<(State, Type)> {
 
 pub fn eval_gate_body(exp: &Exp, ctx: &Context) -> Option<Gate> {
 	match exp {
-		&Exp::Extract(ref _arg, ref cases) => Some(create_extract_gate(cases, ctx)),
+		&Exp::Extract(ref _arg, ref cases) => Some(create_extract_gate_typed(cases, 0, ctx).0),
 		_ => None,
 	}
 }
@@ -377,24 +379,31 @@ pub fn build_gate(val: &RunVal, ctx: &Context) -> Option<Gate> {
 	}
 }
 
-pub fn iterate_val(val: RunVal) -> Ret<Vec<RunVal>> {
+pub fn iterate_val(val: RunVal) -> Option<Vec<RunVal>> {
 	match val {
 		RunVal::Index(i) => {
-			Ok((0..i).map(RunVal::Index).collect())
+			Some((0..i).map(RunVal::Index).collect())
 		},
-		RunVal::Tuple(vals) => Ok(vals),
-		_ => err!("Cannot iterate {}", val),
+		RunVal::Tuple(vals) => Some(vals),
+		_ => None,
 	}
 }
 
-pub fn create_extract_gate(cases: &Vec<Case>, ctx: &Context) -> Gate {
+pub fn create_extract_gate_typed(cases: &Vec<Case>, min_input_size: usize, ctx: &Context) -> (Gate, Type) {
+	fn reduce_type(output_type: Option<Type>, t: Type) -> Option<Type> {
+		Some(match output_type {
+			None => t,
+			Some(ot) => if ot == t {t} else {Type::Any},
+		})
+	}
 	let mut dims: Gate = vec![];
+	let mut output_type = None;
 	for case in cases.iter() {
 		match case {
 			&Case::Exp(ref selector, ref result) => {
 				let selector_state = build_state(eval_exp(selector, ctx));
-				let result_state = build_state(eval_exp(result, ctx));
-				while dims.len() < selector_state.len() {
+				let (result_state, result_type) = build_state_typed(eval_exp(result, ctx)).unwrap();
+				while dims.len() < selector_state.len() || dims.len() < min_input_size {
 					dims.push(vec![]);
 				}
 				for (i, s) in selector_state.iter().enumerate() {
@@ -405,15 +414,17 @@ pub fn create_extract_gate(cases: &Vec<Case>, ctx: &Context) -> Gate {
 						.map(|(r, d)| r * s + d)
 						.collect();
 				}
+				output_type = reduce_type(output_type, result_type);
 			},
 			&Case::Default(ref result) => {
-				let state = build_state(eval_exp(result, ctx));
+				let (state, result_type) = build_state_typed(eval_exp(result, ctx)).unwrap();
 				for i in 0..dims.len() {
 					use num::Zero;
 					if dims[i].prob_sum().is_zero() {
 						dims[i] = state.clone();
 					}
 				}
+				output_type = reduce_type(output_type, result_type);
 			},
 		}
 	}
@@ -422,5 +433,5 @@ pub fn create_extract_gate(cases: &Vec<Case>, ctx: &Context) -> Gate {
 	// if !gate.is_unitary() {
 	// 	panic!("Non-unitary extraction: {:?}", cases);
 	// }
-	gate
+	(gate, output_type.unwrap_or(Type::Any))
 }

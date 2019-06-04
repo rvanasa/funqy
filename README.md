@@ -101,10 +101,6 @@ fn hadamard = {
 	T => F ^ ~T,		//	|1⟩ => (|0⟩ - |1⟩) / sqrt(2)
 }
 
-// Alternate implementation using if/then/else statement
-fn hadamard_cond(s) =
-	if s then F ^ T else F ^ ~T
-
 // SWAP gate
 fn swap = {
 	(F, T) => (T, F), 	//	|01⟩ => |10⟩
