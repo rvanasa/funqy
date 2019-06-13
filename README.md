@@ -19,7 +19,7 @@ Here are a few interesting outcomes of this paradigm:
 - Funqy looks and feels like a high-level programming language, **useful for classical software engineers** unfamiliar with quantum gates and registers.
 - All states and values are immutable and thus **purely functional**. This declarative basis for quantum computation is more intuitive, more optimizable, and more powerful than the quantum circuit paradigm. 
 - The language is fully **architecture-agnostic**; qubits and gates are completely invisible to the language unless otherwise desired.
-- **Classical and quantum algorithms are defined simulaneously**; in other words, the compiler will use the classical version of a function if the input value is correspondingly classical. In effect, only operations which would actually benefit from quantum speed-up are performed on a quantum register.
+- **Classical and quantum algorithms are defined simultaneously**; in other words, the compiler will use the classical version of a function if the input value is correspondingly classical. In effect, only operations which would actually benefit from quantum speed-up are performed on a quantum register.
 - By organizing code in terms of functions and extractions, scripts tend to **semantically convey their underlying purpose and logic**. 
 - On top of "product" space (entanglement/tuples), FunQy unlocks the **"sum" space (matrix/vector indices)** of a quantum system.
 - It is possible to define **non-unitary mappings** (i.e. non-square and/or non-reversible matrices), which compile using auxillary qubits as needed.
