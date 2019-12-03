@@ -91,10 +91,7 @@ fn lib_phf(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 
 fn lib_gate(exp: &Exp, ctx: &Context) -> Ret<RunVal> {
 	let val = eval_exp(exp, ctx);
-	Ok(RunVal::Tuple(build_gate(&val, ctx).ok_or_else(|| Error(format!("Not a gate: {}", val)))?
-		.into_iter()
-		.map(|s| RunVal::State(s, Type::Any /* TODO depend on function type */))
-		.collect()))
+	Ok(RunVal::Gate(build_gate(&val, ctx).ok_or_else(|| Error(format!("Not a gate: {}", val)))?))
 }
 
 fn lib_inv(exp: &Exp, ctx: &Context) -> Ret<RunVal> {

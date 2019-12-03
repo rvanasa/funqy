@@ -9,7 +9,7 @@ use std::rc::Rc;
 use std::collections::HashMap;
 
 #[derive(Clone)]
-pub struct Macro(pub Ident, pub Rc<Fn(&Exp, &Context) -> Ret<RunVal>>);
+pub struct Macro(pub Ident, pub Rc<dyn Fn(&Exp, &Context) -> Ret<RunVal>>);
 
 impl fmt::Debug for Macro {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -110,7 +110,7 @@ impl Context {
 		self.add_type(id, Type::Data(rc))
 	}
 	
-	pub fn add_macro(&mut self, id: &str, handle: &'static Fn(&Exp, &Context) -> Ret<RunVal>) -> Ret {
+	pub fn add_macro(&mut self, id: &str, handle: &'static dyn Fn(&Exp, &Context) -> Ret<RunVal>) -> Ret {
 		self.add_var(id.to_string(), RunVal::Macro(Macro(id.to_string(), Rc::new(handle))), Type::Any /* TODO define macro types */)
 	}
 	

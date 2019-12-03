@@ -31,12 +31,10 @@ Here are a few interesting outcomes of this paradigm:
 
 ### Build Requirements
 
-- [GNU Fortran](http://laptops.eng.uci.edu/software-installation/getting-started-with-programming/fortran-tutorial?tmpl=%2Fsystem%2Fapp%2Ftemplates%2Fprint%2F&showPrintDialog=1) (required for LAPACKE) `>= 4.8`
 - [Nightly Rust](https://doc.rust-lang.org/1.15.1/book/nightly-rust.html) `>= 1.28.0`
 
-If you are using Ubuntu, the following commands will install these dependencies:
+The following command will install the latest version of Rust:
 ```sh
-$ sudo apt-get install -y libgfortran3
 $ curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=nightly
 ```
 

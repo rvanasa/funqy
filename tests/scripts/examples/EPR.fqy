@@ -11,7 +11,7 @@ fn bell = {
 let ibell = inv(bell)
 
 // Note that the brackets around [Bell] designate a typed state rather than a list/array
-fn superdense_coding(epr: [Bell], desired: 2Bool): Bell = {
+fn superdense_coding(epr: [Bell], desired: 2 Bool): Bell = {
 	epr >> (extract desired {
 		(F, F) => identity,
 		(T, F) => pz,

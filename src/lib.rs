@@ -4,8 +4,8 @@ extern crate reqwest;
 extern crate num;
 #[macro_use]
 extern crate nom;
-//extern crate lapacke;
-//extern crate openblas_src;
+extern crate lapacke;
+extern crate lapack_src;
 
 #[macro_use]
 pub mod error;
