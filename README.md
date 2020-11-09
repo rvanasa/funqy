@@ -69,40 +69,40 @@ let (#) = measure		//	Define measurement operator
 
 // identity (no change)
 fn id = {
-	F => F,			//	|0⟩ => |0⟩
-	T => T,			//	|1⟩ => |1⟩
+    F => F,			//	|0⟩ => |0⟩
+    T => T,			//	|1⟩ => |1⟩
 }
 
 // Pauli-X rotation (NOT gate)
 fn px = {
-	F => T,			//	|0⟩ => |1⟩
-	T => F,			//	|1⟩ => |0⟩
+    F => T,			//	|0⟩ => |1⟩
+    T => F,			//	|1⟩ => |0⟩
 }
 let not = px
 let (!) = px
 
 // Pauli-Y rotation
 fn py = {
-	F => @[1/2] T,		//	|0⟩ => |i⟩
-	T => @[-1/2] F,		//	|1⟩ => -|i⟩
+    F => @[1/2] T,		//	|0⟩ => |i⟩
+    T => @[-1/2] F,		//	|1⟩ => -|i⟩
 }
 
 // Pauli-Z rotation
 fn pz = {
-	F => F,			//	|0⟩ => |0⟩
-	T => ~T,		//	|1⟩ => -|1⟩
+    F => F,			//	|0⟩ => |0⟩
+    T => ~T,		//	|1⟩ => -|1⟩
 }
 
 // Hadamard gate
 fn hadamard = {
-	F => F ^ T, 		//	|0⟩ => (|0⟩ + |1⟩) / sqrt(2)
-	T => F ^ ~T,		//	|1⟩ => (|0⟩ - |1⟩) / sqrt(2)
+    F => F ^ T, 		//	|0⟩ => (|0⟩ + |1⟩) / sqrt(2)
+    T => F ^ ~T,		//	|1⟩ => (|0⟩ - |1⟩) / sqrt(2)
 }
 
 // SWAP gate
 fn swap = {
-	(F, T) => (T, F), 	//	|01⟩ => |10⟩
-	(T, F) => (F, T),	//	|10⟩ => |01⟩
+    (F, T) => (T, F), 	//	|01⟩ => |10⟩
+    (T, F) => (F, T),	//	|10⟩ => |01⟩
 }
 
 // sqrt(NOT) gate
@@ -113,11 +113,11 @@ let sqrt_swap = @[1/2] swap
 
 // Controlled gate
 fn c(gate)(ctrl, tgt) = {
-	let out = extract ctrl {
-		F => tgt,	//	|0⟩ ⊗ tgt => |0⟩ ⊗ tgt 
-		T => gate(tgt),	//	|1⟩ ⊗ tgt => |1⟩ ⊗ gate(tgt)
-	}
-	(ctrl, out)
+    let out = extract ctrl {
+        F => tgt,	//	|0⟩ ⊗ tgt => |0⟩ ⊗ tgt 
+        T => gate(tgt),	//	|1⟩ ⊗ tgt => |1⟩ ⊗ gate(tgt)
+    }
+    (ctrl, out)
 }
 
 // Controlled NOT gate
@@ -128,10 +128,10 @@ fn bell_as_circuit(q1, q2) = cnot(hadamard(q1), q2)
 
 // Bell state preparation (implemented via extraction)
 fn bell_as_extract = {
-	(F, F) => (F, F) ^ (T, T),
-	(F, T) => (F, T) ^ (T, F),
-	(T, F) => (F, F) ^ ~(T, T),
-	(T, T) => (F, T) ^ ~(T, F),
+    (F, F) => (F, F) ^ (T, T),
+    (F, T) => (F, T) ^ (T, F),
+    (T, F) => (F, F) ^ ~(T, T),
+    (T, T) => (F, T) ^ ~(T, F),
 }
 
 assert bell_as_circuit == bell_as_extract
@@ -155,9 +155,9 @@ Here is an interesting outcome of using both 2D (qubit) and 3D (qutrit) values i
 data Axis3 = X | Y | Z
 
 fn rotate(r)(s) = extract r {
-	X => px(s)
-	Y => py(s)
-	Z => pz(s)
+    X => px(s)
+    Y => py(s)
+    Z => pz(s)
 }
 
 assert rotate(X) == px
